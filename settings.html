@@ -7,21 +7,58 @@
         <div class="inline-drawer-content">
             <label class="checkbox_label" for="pocket_phone_enabled">
                 <input id="pocket_phone_enabled" type="checkbox" />
-                <span>启用小手机入口按钮</span>
+                <span>启用小手机（对话内入口）</span>
             </label>
             <label class="checkbox_label" for="pocket_phone_sync_main">
                 <input id="pocket_phone_sync_main" type="checkbox" />
-                <span>短信同步写入主聊天（默认关闭，避免污染主线）</span>
+                <span>短信同步写入主聊天（默认关闭）</span>
             </label>
+
+            <hr />
+            <h4>短信 API</h4>
+            <div class="flex-container flexGap5 flexFlowColumn">
+                <label>
+                    <input type="radio" name="pocket_phone_api_mode" value="st" id="pocket_phone_api_mode_st" />
+                    <span>使用酒馆当前聊天 API</span>
+                </label>
+                <label>
+                    <input type="radio" name="pocket_phone_api_mode" value="custom" id="pocket_phone_api_mode_custom" />
+                    <span>使用自定义 API（OpenAI 兼容）</span>
+                </label>
+            </div>
+
+            <div class="flex-container flexGap5 marginTop10">
+                <div id="pocket_phone_import_st_api" class="menu_button menu_button_icon">
+                    <i class="fa-solid fa-plug"></i>
+                    <span>一键接入正在使用的 API</span>
+                </div>
+            </div>
+            <small id="pocket_phone_api_hint" class="marginTop5"></small>
+
+            <div id="pocket_phone_custom_api_fields" class="marginTop10">
+                <label for="pocket_phone_api_url">
+                    <span>API Base URL</span>
+                </label>
+                <input id="pocket_phone_api_url" type="text" class="text_pole" placeholder="https://api.openai.com/v1 或兼容地址" />
+
+                <label for="pocket_phone_api_key" class="marginTop5">
+                    <span>API Key</span>
+                </label>
+                <input id="pocket_phone_api_key" type="password" class="text_pole" placeholder="sk-..." autocomplete="off" />
+
+                <label for="pocket_phone_api_model" class="marginTop5">
+                    <span>Model</span>
+                </label>
+                <input id="pocket_phone_api_model" type="text" class="text_pole" placeholder="gpt-4o-mini / claude-..." />
+            </div>
+
             <div class="flex-container flexGap5 marginTop10">
                 <div id="pocket_phone_open_from_settings" class="menu_button menu_button_icon">
-                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <i class="fa-solid fa-comment-sms"></i>
                     <span>打开小手机</span>
                 </div>
             </div>
-            <small class="marginTop10">
-                安装仓库：https://github.com/vpocket-99/st-pocket-phone
-            </small>
+            <small class="marginTop10">角色短信线程与当前对话角色绑定；切换角色会切换对应会话。</small>
         </div>
     </div>
 </div>

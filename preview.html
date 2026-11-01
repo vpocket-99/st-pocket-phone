@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Pocket Phone 预览（LINE 浅色）</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #dfe3ea; font-family: "SF Pro Text", "PingFang SC", sans-serif; }
+    .preview-chrome {
+      position: relative; z-index: 2; padding: 12px 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      background: #fff; border-bottom: 1px solid #e8ebf0;
+    }
+    .preview-chrome h1 { margin: 0; font-size: 16px; }
+    .preview-chrome button {
+      border: 1px solid #ffd0e1; background: #fff5f9; color: #ff5c9a; border-radius: 999px; padding: 6px 12px; cursor: pointer;
+    }
+    #pocket-phone-root { display: flex !important; pointer-events: auto !important; position: absolute; inset: 56px 0 0 0; }
+    .pocket-phone-backdrop { background: rgba(20,24,32,.2); }
+  </style>
+</head>
+<body>
+  <div class="preview-chrome">
+    <h1>Pocket Phone · LINE 浅色预览</h1>
+    <button type="button" id="btn-home">桌面</button>
+    <button type="button" id="btn-sms">短信</button>
+    <button type="button" id="btn-api">API</button>
+  </div>
+  <div id="pocket-phone-root" class="pocket-phone-open">
+    <div class="pocket-phone-backdrop"></div>
+    <div class="pocket-phone-device">
+      <div class="pocket-phone-screen">
+        <div class="pocket-phone-topbar">
+          <button type="button" class="pp-back" id="btn-back"><i class="fa-solid fa-chevron-left"></i></button>
+          <img class="pocket-phone-avatar" src="https://api.dicebear.com/7.x/thumbs/svg?seed=line" alt="" />
+          <div class="pocket-phone-top-meta">
+            <div class="name">示例角色</div>
+            <div class="sub">酒馆当前 API · 角色绑定</div>
+          </div>
+          <button type="button" class="pp-settings-btn" id="btn-gear"><i class="fa-solid fa-gear"></i></button>
+        </div>
+        <div class="pocket-phone-view active pocket-phone-home" data-view="home">
+          <div class="pocket-phone-hero">
+            <h2>示例角色 的短信</h2>
+            <p>粉色 + 浅绿色 LINE 风 H5。短信与角色绑定；可一键接入酒馆 API 或填自定义 URL/Key。</p>
+          </div>
+          <div class="pocket-phone-home-grid">
+            <button type="button" class="pocket-phone-app-icon" data-open="sms">
+              <div class="icon-tile"><i class="fa-solid fa-comment"></i></div><span>短信</span>
+            </button>
+            <button type="button" class="pocket-phone-app-icon" data-open="settings">
+              <div class="icon-tile" style="background:linear-gradient(145deg,#ff8fb5,#ff5c9a)"><i class="fa-solid fa-plug"></i></div><span>API</span>
+            </button>
+          </div>
+        </div>
+        <div class="pocket-phone-view" data-view="sms">
+          <div class="pocket-phone-messages" id="msgs">
+            <div class="pocket-phone-bubble user">今晚有空吗？想约你喝一杯。</div>
+            <div class="pocket-phone-bubble char">可以啊。你定地方，我洗漱一下就出门。</div>
+            <div class="pocket-phone-bubble user">那老地方见？</div>
+            <div class="pocket-phone-bubble char">嗯，十分钟后到。别迟到哦。</div>
+          </div>
+          <div class="pocket-phone-composer">
+            <textarea id="input" rows="1" placeholder="输入消息…"></textarea>
+            <button type="button" id="send">发送</button>
+          </div>
+        </div>
+        <div class="pocket-phone-view pocket-phone-settings-panel" data-view="settings">
+          <div class="pp-mode-row">
+            <label><input type="radio" name="m" checked /> 使用酒馆当前聊天 API</label>
+            <label><input type="radio" name="m" /> 使用自定义 API</label>
+          </div>
+          <button type="button" class="pp-primary-btn">一键接入正在使用的 API</button>
+          <label>API Base URL</label>
+          <input type="text" placeholder="https://api.openai.com/v1" />
+          <label>API Key</label>
+          <input type="password" placeholder="sk-..." />
+          <label>Model</label>
+          <input type="text" placeholder="模型名" />
+          <button type="button" class="pp-secondary-btn">保存 API 设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    function show(name) {
+      document.querySelectorAll('.pocket-phone-view').forEach(v => v.classList.toggle('active', v.dataset.view === name));
+    }
+    document.getElementById('btn-home').onclick = () => show('home');
+    document.getElementById('btn-sms').onclick = () => show('sms');
+    document.getElementById('btn-api').onclick = () => show('settings');
+    document.getElementById('btn-gear').onclick = () => show('settings');
+    document.getElementById('btn-back').onclick = () => show('home');
+    document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => show(b.dataset.open));
+    document.getElementById('send').onclick = () => {
+      const t = document.getElementById('input').value.trim();
+      if (!t) return;
+      const box = document.getElementById('msgs');
+      box.insertAdjacentHTML('beforeend', `<div class="pocket-phone-bubble user"></div>`);
+      box.lastChild.textContent = t;
+      document.getElementById('input').value = '';
+      box.insertAdjacentHTML('beforeend', `<div class="pocket-phone-bubble char">（预览）收到～真机将按角色上下文回复。</div>`);
+      box.scrollTop = box.scrollHeight;
+    };
+  </script>
+</body>
+</html>
