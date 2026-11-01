@@ -1635,9 +1635,31 @@ body.pp-st-preset-hosted #completion_prompt_manager_popup *:not(.fa-solid):not(.
     font-family: inherit !important;
 }
 
-/* select2 下拉也要压过小手机 */
-body.pp-st-preset-hosted .select2-container--open {
-    z-index: 100450 !important;
+/* select2 下拉：挂在小手机根节点内时也要压过预设面板内容 */
+body.pp-st-preset-hosted .select2-container,
+body.pp-st-preset-hosted .select2-container--open,
+body.pocket-phone-open .select2-container--open,
+#pocket-phone-root .select2-container,
+#pocket-phone-root .select2-container--open {
+    z-index: 2000000 !important;
+}
+
+body.pp-st-preset-hosted .select2-dropdown,
+body.pocket-phone-open .select2-dropdown,
+#pocket-phone-root .select2-dropdown {
+    z-index: 2000001 !important;
+}
+
+/* 预设选择器在小手机里拉满宽度，避免点按热区过小 */
+#pocket-phone-root #settings_preset_openai + .select2-container {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+#pocket-phone-root .select2-container .select2-selection--single {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
 }
 
 /* —— 最近角色列表 —— */

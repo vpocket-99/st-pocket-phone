@@ -11,7 +11,7 @@ import { setUserAvatar, user_avatar, getUserAvatar } from '../../../personas.js'
 const MODULE_NAME = 'st-pocket-phone';
 const EXTENSION_FOLDER = `scripts/extensions/third-party/${MODULE_NAME}`;
 /** 升级 UI 结构时递增，确保旧 DOM 被重建 */
-const PP_UI_VERSION = '35';
+const PP_UI_VERSION = '36';
 const PP_EXPORT_VERSION = 1;
 /** 导入/压缩触发阈值默认值（可在总结记忆页改） */
 const DEFAULT_MEMORY_TOKEN_LIMIT = 10000;
@@ -1467,44 +1467,52 @@ function ensureUi() {
     root.querySelectorAll('.pocket-phone-icon-tabs [data-tab]').forEach(btn => {
         btn.addEventListener('click', () => {
             const tab = btn.getAttribute('data-tab');
-            if (tab !== 'preset') unmountStPresetUi();
+            // 离开预设页只收起弹层，不把整块酒馆 DOM 搬回去（避免切页卡顿）
+            if (tab !== 'preset') parkStPresetUi();
             if (tab === 'sms' && !getActiveCharacter()) {
                 toastr?.info?.('请先从「最近对话」选一个角色');
                 showView('roster');
-                renderCharacterRoster();
-                updateHeader();
+                scheduleUiWork(() => {
+                    renderCharacterRoster();
+                    updateHeader();
+                });
                 return;
             }
             if (tab === 'preset' && !getActiveCharacter()) {
                 toastr?.info?.('请先从「最近对话」选一个角色再打开预设');
                 showView('roster');
-                renderCharacterRoster();
-                updateHeader();
+                scheduleUiWork(() => {
+                    renderCharacterRoster();
+                    updateHeader();
+                });
                 return;
             }
+            // 先切视图，让顶栏/页面立刻响应，再延后搬 DOM / 重渲染
             showView(tab);
-            if (tab === 'roster') {
-                renderCharacterRoster();
-                updateHeader();
-            }
-            if (tab === 'api') syncInlineApiForm();
-            if (tab === 'preset') mountStPresetUi();
-            if (tab === 'more') syncMultilangMoreLabel();
-            if (tab === 'memory') void syncMemoryPage();
-            if (tab === 'sms') {
-                loadThread();
-                updateHeader();
-                renderMessages();
-            }
+            scheduleUiWork(() => {
+                if (tab === 'roster') {
+                    renderCharacterRoster();
+                    updateHeader();
+                }
+                if (tab === 'api') syncInlineApiForm();
+                if (tab === 'preset') mountStPresetUi();
+                if (tab === 'more') syncMultilangMoreLabel();
+                if (tab === 'memory') void syncMemoryPage();
+                if (tab === 'sms') {
+                    loadThread();
+                    updateHeader();
+                    renderMessages();
+                }
+            });
         });
     });
     bindCharacterRosterEvents(root);
     root.querySelector('#pocket-phone-add')?.addEventListener('click', () => addUserBubble());
     root.querySelector('#pocket-phone-reply')?.addEventListener('click', () => void requestModelReply());
     root.querySelector('#pocket-phone-more')?.addEventListener('click', () => {
-        unmountStPresetUi();
+        parkStPresetUi();
         showView('more');
-        syncMultilangMoreLabel();
+        scheduleUiWork(() => syncMultilangMoreLabel());
     });
     root.querySelector('[data-view="more"]')?.addEventListener('click', e => {
         const actionBtn = /** @type {HTMLElement} */ (e.target).closest('[data-more-action]');
@@ -1574,6 +1582,18 @@ function ensureUi() {
     });
     applyBubbleColorVars();
     applyChatBackground();
+}
+
+/** 先让出一帧再跑重活，避免切页时主线程堵到点按无反馈 */
+function scheduleUiWork(fn) {
+    if (typeof fn !== 'function') return;
+    requestAnimationFrame(() => {
+        try {
+            fn();
+        } catch (err) {
+            console.warn('[st-pocket-phone] scheduled UI work failed', err);
+        }
+    });
 }
 
 function showView(name) {
@@ -2752,9 +2772,80 @@ function closePromptPopupIfOpen() {
     popup.style.setProperty('display', 'none', 'important');
 }
 
+/**
+ * Electron / 高 z-index 浮层里，原生 <select> 下拉常被盖住。
+ * 在小手机内给预设选择器套 select2，并把下拉挂到 #pocket-phone-root。
+ */
+function ensurePhonePresetSelectDropdown() {
+    const $ = window.jQuery;
+    if (!$?.fn?.select2) return;
+    const sel = document.querySelector('#pp-st-preset-mount #settings_preset_openai')
+        || document.querySelector('#pocket-phone-root #settings_preset_openai');
+    if (!sel) return;
+    const $sel = $(sel);
+    const phone = $('#pocket-phone-root');
+    if (!phone.length) return;
+
+    try {
+        if ($sel.data('select2')) {
+            // 已是我们挂过的，只确保打开时抬层
+        } else {
+            $sel.select2({
+                width: '100%',
+                dropdownParent: phone,
+                minimumResultsForSearch: 6,
+            });
+            $sel.attr('data-pp-select2', '1');
+        }
+    } catch (err) {
+        console.warn('[st-pocket-phone] preset select2 init failed', err);
+        return;
+    }
+
+    $sel.off('select2:open.ppz').on('select2:open.ppz', () => {
+        requestAnimationFrame(() => {
+            document.querySelectorAll(
+                '#pocket-phone-root .select2-container--open, #pocket-phone-root .select2-dropdown, .select2-container--open',
+            ).forEach((node) => {
+                /** @type {HTMLElement} */ (node).style.setProperty('z-index', '2000000', 'important');
+            });
+        });
+    });
+}
+
+function teardownPhonePresetSelectDropdown() {
+    const $ = window.jQuery;
+    if (!$?.fn?.select2) return;
+    const $sel = $('#settings_preset_openai');
+    if (!$sel.length || !$sel.data('select2')) return;
+    // 只拆我们套过的，避免误伤酒馆别处
+    if ($sel.attr('data-pp-select2') !== '1') return;
+    try {
+        $sel.off('select2:open.ppz');
+        $sel.select2('destroy');
+        $sel.removeAttr('data-pp-select2');
+    } catch (err) {
+        console.warn('[st-pocket-phone] preset select2 destroy failed', err);
+    }
+}
+
+/** 切走预设页：只关编辑弹层，保留已搬入的 DOM，减少反复挂载卡顿 */
+function parkStPresetUi() {
+    closePromptPopupIfOpen();
+}
+
 function mountStPresetUi() {
     const host = document.getElementById('pp-st-preset-mount');
     if (!host) return;
+
+    const already = stPresetMounted && host.contains(document.getElementById('openai_api-presets'));
+    if (already) {
+        document.body.classList.add('pp-st-preset-hosted');
+        ensureStPresetPopupLayer();
+        ensurePhonePresetSelectDropdown();
+        ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true });
+        return;
+    }
 
     ensureStPresetPopupLayer();
     patchPromptManagerPopup();
@@ -2787,10 +2878,12 @@ function mountStPresetUi() {
     stPresetMounted = true;
     document.body.classList.add('pp-st-preset-hosted');
     patchPromptManagerSaveHook();
+    ensurePhonePresetSelectDropdown();
     // 必须等真正切到小手机预设 B 后再写入条目，禁止污染主聊天 A
     ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true });
     setTimeout(() => ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true }), 400);
-    reinitPromptListSortable();
+    // sortable 重建较重，延后一帧
+    scheduleUiWork(() => reinitPromptListSortable());
 }
 
 /** DOM 搬进小手机后，用酒馆原生 makeDraggable 重建；并强制只用拖拽手柄，避免整行拖拽吞掉铅笔点击 */
@@ -2850,6 +2943,7 @@ function unmountStPresetUi() {
     }
 
     closePromptPopupIfOpen();
+    teardownPhonePresetSelectDropdown();
     restoreStPresetPopupLayer();
 
     for (const id of ST_PRESET_NODE_IDS) {
@@ -3220,10 +3314,28 @@ function startPhoneOverlayGuard() {
     }
     ppOverlayObserver = new MutationObserver((mutations) => {
         if (ppOverlayElevating) return;
+        // 只关心 toast / select2 / dialog，避免切页时整树 mutation 拖慢 UI
         for (const m of mutations) {
             if (m.type !== 'childList') continue;
-            scheduleElevateOverlays();
-            return;
+            const nodes = /** @type {Element[]} */ ([
+                ...Array.from(m.addedNodes).filter(n => n.nodeType === 1),
+                ...Array.from(m.removedNodes).filter(n => n.nodeType === 1),
+            ]);
+            for (const el of nodes) {
+                const id = el.id || '';
+                const cls = el.classList;
+                if (
+                    id === 'toast-container'
+                    || el.tagName === 'DIALOG'
+                    || cls?.contains('select2-container')
+                    || cls?.contains('select2-dropdown')
+                    || cls?.contains('popup')
+                    || el.querySelector?.('#toast-container, .select2-container, .select2-dropdown, dialog.popup')
+                ) {
+                    scheduleElevateOverlays();
+                    return;
+                }
+            }
         }
     });
     ppOverlayObserver.observe(document.body, { childList: true, subtree: true });
