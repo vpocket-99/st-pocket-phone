@@ -131,6 +131,7 @@ function ensureUi() {
 
     const root = document.createElement('div');
     root.id = 'pocket-phone-root';
+    // Mount on body to avoid ST transformed ancestors collapsing fixed layers
     root.innerHTML = `
         <div class="pocket-phone-backdrop" data-pocket-close="1"></div>
         <div class="pocket-phone-device" role="dialog" aria-label="Pocket Phone">
@@ -194,7 +195,7 @@ function ensureUi() {
             </div>
         </div>
     `;
-    document.body.appendChild(root);
+    document.documentElement.appendChild(root);
 
     root.querySelector('.pocket-phone-backdrop')?.addEventListener('click', () => closePhone());
     root.querySelector('[data-nav="back"]')?.addEventListener('click', () => {

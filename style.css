@@ -39,23 +39,35 @@
 }
 
 #pocket-phone-root {
-    position: fixed;
-    inset: 0;
-    z-index: 9600;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    z-index: 100000 !important;
     display: none;
     align-items: stretch;
     justify-content: center;
     pointer-events: none;
+    margin: 0 !important;
+    transform: none !important;
+    inset: auto !important;
 }
 
 #pocket-phone-root.pocket-phone-open {
-    display: flex;
-    pointer-events: auto;
+    display: flex !important;
+    pointer-events: auto !important;
 }
 
 .pocket-phone-backdrop {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: rgba(20, 24, 32, 0.28);
 }
 
@@ -63,7 +75,8 @@
     position: relative;
     width: min(440px, 100%);
     height: 100%;
-    max-height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
     margin: 0 auto;
     background: var(--pp-bg);
     color: var(--pp-text);
@@ -77,9 +90,11 @@
     #pocket-phone-root.pocket-phone-open {
         align-items: center;
         padding: 24px 16px;
+        box-sizing: border-box;
     }
     .pocket-phone-device {
         height: min(780px, calc(100dvh - 48px));
+        min-height: 0;
         border-radius: 28px;
         overflow: hidden;
     }
