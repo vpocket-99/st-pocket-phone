@@ -368,32 +368,43 @@
     border-bottom-left-radius: 6px;
 }
 
-/* 思维链：气泡左上角小图标 + 展开面板 */
+/* 思维链：独立一行在正文上方，避免图标叠字 */
 .pocket-phone-bubble.has-thinking {
-    position: relative;
-    padding-top: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding-top: 8px;
+}
+
+.pp-think-chrome {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .pp-think-btn {
-    position: absolute;
-    top: 4px;
-    left: 8px;
-    z-index: 2;
+    position: static;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
-    padding: 0;
+    gap: 4px;
+    width: auto;
+    height: auto;
+    min-height: 20px;
+    padding: 2px 8px 2px 6px;
     margin: 0;
     border: none;
-    border-radius: 50%;
+    border-radius: 999px;
     background: rgba(90, 110, 140, 0.12);
     color: #6a7a92;
-    font-size: 10px;
-    line-height: 1;
+    font-size: 11px;
+    line-height: 1.2;
     cursor: pointer;
-    opacity: 0.78;
+    opacity: 0.9;
     transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
@@ -413,17 +424,25 @@
 
 .pp-think-btn i {
     pointer-events: none;
-    font-size: 9px;
+    font-size: 10px;
+}
+
+.pp-think-btn-label {
+    pointer-events: none;
+    font-size: 11px;
+    font-weight: 500;
 }
 
 .pp-think-panel {
     display: none;
-    margin: 2px 0 8px;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
     padding: 8px 9px;
     border-radius: 10px;
     background: rgba(70, 82, 104, 0.06);
     border: 1px solid rgba(70, 82, 104, 0.12);
-    max-height: 9.5em;
+    max-height: min(55vh, 28em);
     overflow: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -451,7 +470,7 @@
     padding: 0;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 11px;
-    line-height: 1.4;
+    line-height: 1.45;
     color: #5a6474;
     white-space: pre-wrap;
     overflow-wrap: anywhere;

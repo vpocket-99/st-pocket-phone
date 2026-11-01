@@ -11,7 +11,7 @@ import { setUserAvatar, user_avatar, getUserAvatar } from '../../../personas.js'
 const MODULE_NAME = 'st-pocket-phone';
 const EXTENSION_FOLDER = `scripts/extensions/third-party/${MODULE_NAME}`;
 /** 升级 UI 结构时递增，确保旧 DOM 被重建 */
-const PP_UI_VERSION = '31';
+const PP_UI_VERSION = '32';
 const PP_EXPORT_VERSION = 1;
 /** 导入/压缩触发阈值默认值（可在总结记忆页改） */
 const DEFAULT_MEMORY_TOKEN_LIMIT = 10000;
@@ -2771,12 +2771,15 @@ function renderThinkChrome(m) {
     if (!thinking) return '';
     const open = !!m.thinkingOpen;
     return `
-        <button type="button" class="pp-think-btn${open ? ' is-open' : ''}" data-think-toggle="1" title="查看思考过程" aria-label="查看思考过程">
-            <i class="fa-solid fa-brain"></i>
-        </button>
-        <div class="pp-think-panel${open ? ' is-open' : ''}" data-think-panel="1" ${open ? '' : 'hidden'}>
-            <div class="pp-think-panel-title">思考过程</div>
-            <pre class="pp-think-panel-body">${escapeHtml(thinking)}</pre>
+        <div class="pp-think-chrome">
+            <button type="button" class="pp-think-btn${open ? ' is-open' : ''}" data-think-toggle="1" title="查看思考过程" aria-label="查看思考过程">
+                <i class="fa-solid fa-brain"></i>
+                <span class="pp-think-btn-label">思考</span>
+            </button>
+            <div class="pp-think-panel${open ? ' is-open' : ''}" data-think-panel="1" ${open ? '' : 'hidden'}>
+                <div class="pp-think-panel-title">思考过程</div>
+                <pre class="pp-think-panel-body">${escapeHtml(thinking)}</pre>
+            </div>
         </div>
     `;
 }
@@ -4504,12 +4507,15 @@ function clearPendingFlags() {
 }
 
 /**
- * 从模型原文里抽出思维链，并返回洗净后的可见正文。
- * 兼容多种常见标签 / 代码块 / 未闭合前缀，尽量少渲染失败。
+ * 从模型原文里抽出「预设要求的」思维链标签，并返回洗净后的可见正文。
+ * 注意：不要把 API 原生 reasoning_content 混进来（那是另一路）。
  * @param {string} raw
+ * @param {{ allowUnclosed?: boolean }} [opts]
+ *   allowUnclosed=false：流式中段只用已闭合块，避免半截 <think> 被提前截断丢失后半段
  * @returns {{ clean: string, thinking: string }}
  */
-function extractThinkingFromText(raw) {
+function extractThinkingFromText(raw, opts = {}) {
+    const allowUnclosed = opts.allowUnclosed !== false;
     let text = String(raw || '');
     /** @type {string[]} */
     const parts = [];
@@ -4535,7 +4541,7 @@ function extractThinkingFromText(raw) {
         });
     }
 
-    // DeepSeek / 特殊分隔符
+    // DeepSeek / 特殊分隔符（已闭合）
     text = text.replace(/<\|begin_of_thought\|>([\s\S]*?)<\|end_of_thought\|>/gi, (_, body) => {
         pushPart(body);
         return '\n';
@@ -4553,7 +4559,7 @@ function extractThinkingFromText(raw) {
         return '\n';
     });
 
-    // 方括号 / 中文包裹（允许标签名不完全一致）
+    // 方括号 / 中文包裹
     text = text.replace(/\[(?:thinking|thought|reasoning|think|cot|分析|思考|推理|思维链)\]([\s\S]*?)\[\/(?:thinking|thought|reasoning|think|cot|分析|思考|推理|思维链)\]/gi, (_, body) => {
         pushPart(body);
         return '\n';
@@ -4563,33 +4569,33 @@ function extractThinkingFromText(raw) {
         return '\n';
     });
 
-    // markdown fence: ```thinking / ```reason / ```thought
+    // markdown fence
     text = text.replace(/```(?:thinking|thought|reasoning|reason|analysis|think|cot|scratchpad)[^\n]*\n([\s\S]*?)```/gi, (_, body) => {
         pushPart(body);
         return '\n';
     });
 
-    // markdown 标题块：## Thinking / ### 思考 直到空行+标签或下一个标题
-    text = text.replace(/(?:^|\n)#{1,3}\s*(?:thinking|thought|reasoning|analysis|思考|推理|思维链)\s*\n([\s\S]*?)(?=\n#{1,3}\s|\n<(?:msg|voice)\b|$)/gi, (_, body) => {
-        pushPart(body);
-        return '\n';
-    });
+    if (allowUnclosed) {
+        // 仅在终态 / 已见到 msg 时：吃掉未闭合思维块，避免进气泡
+        text = text.replace(/(?:^|\n)#{1,3}\s*(?:thinking|thought|reasoning|analysis|思考|推理|思维链)\s*\n([\s\S]*?)(?=\n#{1,3}\s|\n<(?:msg|voice)\b|$)/gi, (_, body) => {
+            pushPart(body);
+            return '\n';
+        });
+        text = text.replace(/<(think|thinking|thought|reasoning|reason|redacted_reasoning|analysis|scratchpad|inner_monologue|reflection)\b[^>]*>([\s\S]*?)(?=<(?:msg|voice)\b|$)/gi, (_, _tag, body) => {
+            pushPart(body);
+            return '\n';
+        });
+        text = text.replace(/<\|begin_of_thought\|>([\s\S]*?)(?=<(?:msg|voice)\b|<\|end_of_thought\|>|$)/gi, (_, body) => {
+            pushPart(body);
+            return '\n';
+        });
 
-    // 未闭合：任意位置的 <think>... 直到首个 <msg>/<voice> 或文末
-    text = text.replace(/<(think|thinking|thought|reasoning|reason|redacted_reasoning|analysis|scratchpad|inner_monologue|reflection)\b[^>]*>([\s\S]*?)(?=<(?:msg|voice)\b|$)/gi, (_, _tag, body) => {
-        pushPart(body);
-        return '\n';
-    });
-    text = text.replace(/<\|begin_of_thought\|>([\s\S]*?)(?=<(?:msg|voice)\b|<\|end_of_thought\|>|$)/gi, (_, body) => {
-        pushPart(body);
-        return '\n';
-    });
-
-    // 残留开/闭标签、特殊 token（流式半截）尽量清掉，避免进气泡
-    text = text.replace(/<\/?(?:think|thinking|thought|reasoning|reason|redacted_reasoning|chain_of_thought|cot|analysis|scratchpad|inner_monologue|reflection)\b[^>]*>/gi, '');
-    text = text.replace(/<\|(?:begin_of_thought|end_of_thought|thinking|\/thinking|end_thinking)\|>/gi, '');
-    text = text.replace(/◁\/?think▷/gi, '');
-    text = text.replace(/\[\/?(?:THINK|thinking|thought|reasoning|think|cot|分析|思考|推理|思维链)\]/gi, '');
+        // 终态再清残留标签
+        text = text.replace(/<\/?(?:think|thinking|thought|reasoning|reason|redacted_reasoning|chain_of_thought|cot|analysis|scratchpad|inner_monologue|reflection)\b[^>]*>/gi, '');
+        text = text.replace(/<\|(?:begin_of_thought|end_of_thought|thinking|\/thinking|end_thinking)\|>/gi, '');
+        text = text.replace(/◁\/?think▷/gi, '');
+        text = text.replace(/\[\/?(?:THINK|thinking|thought|reasoning|think|cot|分析|思考|推理|思维链)\]/gi, '');
+    }
 
     return {
         clean: text.replace(/\n{3,}/g, '\n\n').trim(),
@@ -4642,7 +4648,7 @@ function parsePhoneReply(raw) {
 }
 
 /**
- * 流式增量解析：先剥离已闭合思维块，再每凑齐 </msg>/</voice> 回调。
+ * 流式增量解析：中段只剥「已闭合」思维块；见到 <msg> 或结束时再处理未闭合思维块。
  * @param {(bubble: { role: 'char' | 'voice', text: string }) => (void|Promise<void>)} onBubble
  */
 function createTagStreamParser(onBubble) {
@@ -4650,26 +4656,37 @@ function createTagStreamParser(onBubble) {
     let emitted = 0;
     let thinking = '';
     const tagRe = /<(msg|voice)\b[^>]*>([\s\S]*?)<\/\1>/i;
+    const openThinkRe = /<(?:think|thinking|thought|reasoning|reason|redacted_reasoning|analysis|scratchpad|inner_monologue|reflection)\b/i;
 
-    const drainThinking = () => {
-        const extracted = extractThinkingFromText(buf);
-        if (extracted.thinking) {
-            thinking = mergeThinkingParts(thinking, extracted.thinking);
-        }
-        // 未完成的开标签先留在 buf 里等后续；extract 已尽量只剥闭合块
-        // 若仍含未闭合 think 且后面已出现 msg，extractThinkingFromText 会处理
+    const takeClosedThinking = () => {
+        const extracted = extractThinkingFromText(buf, { allowUnclosed: false });
+        if (extracted.thinking) thinking = mergeThinkingParts(thinking, extracted.thinking);
         buf = extracted.clean;
-        // 再跑一遍未闭合前缀（clean 可能仍带半截开标签后接 msg）
-        const again = extractThinkingFromText(buf);
-        if (again.thinking) thinking = mergeThinkingParts(thinking, again.thinking);
-        buf = again.clean;
+    };
+
+    /** 已能看到 msg/voice 时，把前面的未闭合思维块收干净 */
+    const takeUnclosedThinkingBeforeMsg = () => {
+        if (!openThinkRe.test(buf)) return;
+        if (!/<(?:msg|voice)\b/i.test(buf)) return;
+        const extracted = extractThinkingFromText(buf, { allowUnclosed: true });
+        if (extracted.thinking) thinking = mergeThinkingParts(thinking, extracted.thinking);
+        buf = extracted.clean;
     };
 
     const drain = async () => {
-        drainThinking();
+        takeClosedThinking();
+        takeUnclosedThinkingBeforeMsg();
         while (true) {
             const m = buf.match(tagRe);
             if (!m || m.index == null) break;
+            // 标签前若还夹着 think 开标签，先收掉
+            if (m.index > 0 && openThinkRe.test(buf.slice(0, m.index))) {
+                const head = buf.slice(0, m.index);
+                const extracted = extractThinkingFromText(head, { allowUnclosed: true });
+                if (extracted.thinking) thinking = mergeThinkingParts(thinking, extracted.thinking);
+                buf = `${extracted.clean}${buf.slice(m.index)}`.replace(/^\n+/, '');
+                continue;
+            }
             const full = m[0];
             const tag = m[1].toLowerCase();
             const body = String(m[2] || '').trim();
@@ -4692,7 +4709,7 @@ function createTagStreamParser(onBubble) {
         /** @returns {Promise<number>} */
         async end() {
             await drain();
-            const restExtract = extractThinkingFromText(buf);
+            const restExtract = extractThinkingFromText(buf, { allowUnclosed: true });
             if (restExtract.thinking) thinking = mergeThinkingParts(thinking, restExtract.thinking);
             const rest = restExtract.clean.trim();
             buf = '';
@@ -4769,7 +4786,8 @@ function buildPhoneTaskPrompt(userBundle) {
         : '';
     // 格式 / 语音 / 多语言 已作为 PromptManager 强制条目注入，quiet 任务不再重复塞一遍
     return applyPhoneLanguageMacros(`【小手机短信任务】
-这是手机短信私聊回合。请严格遵循「当前已启用的聊天补全预设」中的全部提示词、输出协议与格式（含多语言 / <msg> / <i18n> / 语音条规则等）。
+这是手机短信私聊回合。请严格遵循「当前已启用的聊天补全预设」中的全部提示词、输出协议与格式（含多语言 / <msg> / <i18n> / 语音条 / 思维链规则等）。
+若预设要求输出思维链 / 思考过程（如 <think>、<thinking>、<analysis> 等），必须按预设规定的标签与结构完整输出，再输出短信标签。
 不要改用其它格式；不要输出旁白、系统说明或协议解释。${langHint}
 
 【小手机总结记忆｜长期】
@@ -5657,9 +5675,11 @@ async function generateModelReply(userTexts, opts = {}) {
         const settings = getSettings();
         // 串行出泡：每个完整 </msg> 先画出来再读后续 token（整包到达也会逐条露出）
         const parserSerial = createTagStreamParser(bubble => pushBubbleLive(bubble));
-        let apiThinking = '';
+        // API 原生 reasoning_content（DeepSeek/Claude thoughts 等）与预设要求的 <think> 不是一路；
+        // 只作「正文里完全没有思维标签」时的兜底，避免把模型内部推理误当成预设思维链。
+        let apiNativeReasoning = '';
         const onReasoning = (delta) => {
-            apiThinking = mergeThinkingParts(apiThinking, delta);
+            apiNativeReasoning = mergeThinkingParts(apiNativeReasoning, delta);
         };
 
         if (settings.apiMode === 'custom') {
@@ -5667,7 +5687,7 @@ async function generateModelReply(userTexts, opts = {}) {
             const prompt = buildGenerationPrompt(userBundle);
             await generateViaCustomApiStream(prompt, delta => parserSerial.push(delta), onReasoning);
         } else {
-            // 酒馆模式：quiet 任务 + 当前选用预设的完整提示词链路
+            // 酒馆模式：quiet 任务 + 当前选用预设的完整提示词链路（含预设里的思维链条目）
             const quietPrompt = buildPhoneTaskPrompt(userBundle);
             try {
                 await generateViaStStream(quietPrompt, delta => parserSerial.push(delta), onReasoning);
@@ -5679,7 +5699,8 @@ async function generateModelReply(userTexts, opts = {}) {
         }
         await parserSerial.end();
 
-        const thinking = mergeThinkingParts(parserSerial.getThinking(), apiThinking);
+        const presetThinking = String(parserSerial.getThinking() || '').trim();
+        const thinking = presetThinking || String(apiNativeReasoning || '').trim();
         if (thinking) {
             const first = activeThread.find(m =>
                 m.replyGroupId === replyGroupId && (m.role === 'char' || m.role === 'voice'));
@@ -5688,6 +5709,8 @@ async function generateModelReply(userTexts, opts = {}) {
                 persistThread();
                 renderMessages();
             }
+        } else if (apiNativeReasoning) {
+            console.info('[st-pocket-phone] ignored native reasoning (no preset think tags in content)');
         }
 
         if (!activeThread.some(m => m.replyGroupId === replyGroupId && (m.role === 'char' || m.role === 'voice'))) {
