@@ -1,0 +1,30 @@
+# 本地环境 / 密钥
+.env
+.env.*
+*.pem
+*.key
+credentials*.json
+secrets*.json
+
+# 小手机导出的用户数据（勿提交）
+**/pocket-phone-export*.json
+**/pp-export*.json
+**/st-pocket-phone-backup*.json
+*.export.json
+
+# 可能含聊天/头像/背景的本地备份
+**/settings.json
+**/extension_settings*.json
+**/threads*.json
+**/background*.json
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# 依赖（本扩展无打包构建）
+node_modules/
