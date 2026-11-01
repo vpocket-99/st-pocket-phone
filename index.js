@@ -11,7 +11,7 @@ import { setUserAvatar, user_avatar, getUserAvatar } from '../../../personas.js'
 const MODULE_NAME = 'st-pocket-phone';
 const EXTENSION_FOLDER = `scripts/extensions/third-party/${MODULE_NAME}`;
 /** 升级 UI 结构时递增，确保旧 DOM 被重建 */
-const PP_UI_VERSION = '33';
+const PP_UI_VERSION = '34';
 const PP_EXPORT_VERSION = 1;
 /** 导入/压缩触发阈值默认值（可在总结记忆页改） */
 const DEFAULT_MEMORY_TOKEN_LIMIT = 10000;
@@ -3011,12 +3011,13 @@ function renderTypingBubbleHtml() {
 }
 
 /**
- * @param {{ animateIdx?: number|null }} [opts]
+ * @param {{ animateIdx?: number|null, forceBottom?: boolean }} [opts]
  */
 function renderMessages(opts = {}) {
     const box = document.getElementById('pocket-phone-messages');
     if (!box) return;
     const animateIdx = Number.isFinite(opts.animateIdx) ? Number(opts.animateIdx) : null;
+    const forceBottom = !!opts.forceBottom;
     const stickBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
     hideBubbleMenu();
     const parts = activeThread.map((m, idx) => {
@@ -3038,12 +3039,24 @@ function renderMessages(opts = {}) {
     });
     if (phoneTyping) parts.push(renderTypingBubbleHtml());
     box.innerHTML = parts.join('');
-    if (stickBottom || phoneTyping || animateIdx != null) box.scrollTop = box.scrollHeight;
+    if (forceBottom || stickBottom || phoneTyping || animateIdx != null) {
+        const pin = () => { box.scrollTop = box.scrollHeight; };
+        pin();
+        requestAnimationFrame(pin);
+    }
+}
+
+function scrollMessagesToBottom() {
+    const box = document.getElementById('pocket-phone-messages');
+    if (!box) return;
+    const pin = () => { box.scrollTop = box.scrollHeight; };
+    pin();
+    requestAnimationFrame(pin);
 }
 
 function setTypingIndicator(on) {
     phoneTyping = !!on;
-    renderMessages();
+    renderMessages({ forceBottom: !!on });
 }
 
 function refreshSmsUi() {
@@ -3259,7 +3272,7 @@ function addUserBubble() {
     persistThread();
     if (input) input.value = '';
     autoGrowComposerInput();
-    renderMessages();
+    renderMessages({ forceBottom: true });
 }
 
 function autoGrowComposerInput() {
@@ -4668,12 +4681,66 @@ function clearPendingFlags() {
     }
 }
 
+/** 思维块开/闭标签名（用于深度判断与剥离） */
+const PP_THINK_TAG_NAMES = [
+    'think', 'thinking', 'thought', 'reasoning', 'reason',
+    'redacted_reasoning', 'chain_of_thought', 'cot', 'analysis',
+    'scratchpad', 'inner_monologue', 'reflection',
+];
+
+/**
+ * 统计一段文本里未闭合的思维开标签深度（>0 表示仍在思维块内）。
+ * 思维里举例写的 <msg> 不应降低深度。
+ */
+function unclosedThinkDepth(text) {
+    const re = new RegExp(`</?(?:${PP_THINK_TAG_NAMES.join('|')})\\b[^>]*>`, 'gi');
+    let depth = 0;
+    let m;
+    while ((m = re.exec(String(text || ''))) !== null) {
+        if (m[0].startsWith('</')) depth = Math.max(0, depth - 1);
+        else depth += 1;
+    }
+    return depth;
+}
+
+/**
+ * 查找「独立成行」的尾部 <msg>/<voice> 气泡区起点。
+ * 行内举例（如：请使用 <msg>…</msg>）不会算作气泡区。
+ * @returns {number} 起点下标；没有则 -1
+ */
+function findTrailingBubbleRegionStart(text) {
+    const s = String(text || '');
+    const re = /(?:^|\n)[ \t]*<(msg|voice)\b[^>]*>[\s\S]*?<\/\1>/gi;
+    /** @type {{ index: number, end: number }[]} */
+    const hits = [];
+    let m;
+    while ((m = re.exec(s)) !== null) {
+        const rawIdx = m.index;
+        const lead = m[0].match(/^\n/);
+        const index = lead ? rawIdx + 1 : rawIdx;
+        hits.push({ index, end: rawIdx + m[0].length });
+    }
+    if (!hits.length) return -1;
+
+    let endPos = s.length;
+    let i = hits.length - 1;
+    while (i >= 0) {
+        const after = s.slice(hits[i].end, endPos);
+        if (after.trim() !== '') break;
+        endPos = hits[i].index;
+        i -= 1;
+    }
+    const first = i + 1;
+    if (first >= hits.length) return -1;
+    return hits[first].index;
+}
+
 /**
  * 从模型原文里抽出「预设要求的」思维链标签，并返回洗净后的可见正文。
  * 注意：不要把 API 原生 reasoning_content 混进来（那是另一路）。
+ * 未闭合思维块时，不会因为块内举例写的 <msg> 而被截断；只在「独立成行」的尾部气泡前结束。
  * @param {string} raw
  * @param {{ allowUnclosed?: boolean }} [opts]
- *   allowUnclosed=false：流式中段只用已闭合块，避免半截 <think> 被提前截断丢失后半段
  * @returns {{ clean: string, thinking: string }}
  */
 function extractThinkingFromText(raw, opts = {}) {
@@ -4688,14 +4755,8 @@ function extractThinkingFromText(raw, opts = {}) {
         if (t) parts.push(t);
     };
 
-    const closedTagNames = [
-        'think', 'thinking', 'thought', 'reasoning', 'reason',
-        'redacted_reasoning', 'chain_of_thought', 'cot', 'analysis',
-        'scratchpad', 'inner_monologue', 'reflection',
-    ];
-    // 同名闭合 + 交叉闭合（如 <think>...</thinking>）
-    const closeAlt = closedTagNames.join('|');
-    for (const name of closedTagNames) {
+    const closeAlt = PP_THINK_TAG_NAMES.join('|');
+    for (const name of PP_THINK_TAG_NAMES) {
         const re = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/(?:${closeAlt})>`, 'gi');
         text = text.replace(re, (_, body) => {
             pushPart(body);
@@ -4738,22 +4799,36 @@ function extractThinkingFromText(raw, opts = {}) {
     });
 
     if (allowUnclosed) {
-        // 仅在终态 / 已见到 msg 时：吃掉未闭合思维块，避免进气泡
-        text = text.replace(/(?:^|\n)#{1,3}\s*(?:thinking|thought|reasoning|analysis|思考|推理|思维链)\s*\n([\s\S]*?)(?=\n#{1,3}\s|\n<(?:msg|voice)\b|$)/gi, (_, body) => {
+        // markdown 标题思维块：只在「独立成行」气泡前结束
+        text = text.replace(/(?:^|\n)#{1,3}\s*(?:thinking|thought|reasoning|analysis|思考|推理|思维链)\s*\n([\s\S]*?)(?=\n#{1,3}\s|(?:\r?\n)[ \t]*<(?:msg|voice)\b|$)/gi, (_, body) => {
             pushPart(body);
             return '\n';
         });
-        text = text.replace(/<(think|thinking|thought|reasoning|reason|redacted_reasoning|analysis|scratchpad|inner_monologue|reflection)\b[^>]*>([\s\S]*?)(?=<(?:msg|voice)\b|$)/gi, (_, _tag, body) => {
-            pushPart(body);
-            return '\n';
-        });
-        text = text.replace(/<\|begin_of_thought\|>([\s\S]*?)(?=<(?:msg|voice)\b|<\|end_of_thought\|>|$)/gi, (_, body) => {
+
+        // 未闭合 XML 思维块：行内举例 <msg> 不截断；只切在成行气泡前
+        const openThinkRe = new RegExp(`<(${closeAlt})\\b[^>]*>`, 'i');
+        const openHit = text.match(openThinkRe);
+        if (openHit && openHit.index != null) {
+            const openIdx = openHit.index;
+            const bodyStart = openIdx + openHit[0].length;
+            const after = text.slice(bodyStart);
+            const trailRel = findTrailingBubbleRegionStart(after);
+            if (trailRel >= 0) {
+                pushPart(after.slice(0, trailRel));
+                text = `${text.slice(0, openIdx)}\n${after.slice(trailRel)}`;
+            } else {
+                pushPart(after);
+                text = text.slice(0, openIdx);
+            }
+        }
+
+        text = text.replace(/<\|begin_of_thought\|>([\s\S]*?)(?=(?:\r?\n)[ \t]*<(?:msg|voice)\b|<\|end_of_thought\|>|$)/gi, (_, body) => {
             pushPart(body);
             return '\n';
         });
 
         // 终态再清残留标签
-        text = text.replace(/<\/?(?:think|thinking|thought|reasoning|reason|redacted_reasoning|chain_of_thought|cot|analysis|scratchpad|inner_monologue|reflection)\b[^>]*>/gi, '');
+        text = text.replace(new RegExp(`</?(?:${closeAlt})\\b[^>]*>`, 'gi'), '');
         text = text.replace(/<\|(?:begin_of_thought|end_of_thought|thinking|\/thinking|end_thinking)\|>/gi, '');
         text = text.replace(/◁\/?think▷/gi, '');
         text = text.replace(/\[\/?(?:THINK|thinking|thought|reasoning|think|cot|分析|思考|推理|思维链)\]/gi, '');
@@ -4783,10 +4858,11 @@ function mergeThinkingParts(...chunks) {
  * @returns {{ role: 'char' | 'voice', text: string }[]}
  */
 function parsePhoneReply(raw) {
-    const { clean } = extractThinkingFromText(raw);
+    const { clean } = extractThinkingFromText(raw, { allowUnclosed: true });
     const text = String(clean || '').trim();
     const out = [];
-    const re = /<(msg|voice|sticker|ima)\b[^>]*>([\s\S]*?)<\/\1>/gi;
+    // 只认独立成行的气泡，避免思维/说明里的行内 <msg> 举例被当成短信
+    const re = /(?:^|\n)[ \t]*<(msg|voice|sticker|ima)\b[^>]*>([\s\S]*?)<\/\1>/gi;
     let match;
     while ((match = re.exec(text)) !== null) {
         const tag = match[1].toLowerCase();
@@ -4810,15 +4886,18 @@ function parsePhoneReply(raw) {
 }
 
 /**
- * 流式增量解析：中段只剥「已闭合」思维块；见到 <msg> 或结束时再处理未闭合思维块。
+ * 流式增量解析：
+ * - 中段只剥已闭合思维块
+ * - 未闭合思维块内的行内 <msg> 举例不触发出泡、也不截断思维
+ * - 仅「独立成行」的 <msg>/<voice> 在思维块之外（或终态尾部气泡区）才出泡
  * @param {(bubble: { role: 'char' | 'voice', text: string }) => (void|Promise<void>)} onBubble
  */
 function createTagStreamParser(onBubble) {
     let buf = '';
     let emitted = 0;
     let thinking = '';
-    const tagRe = /<(msg|voice)\b[^>]*>([\s\S]*?)<\/\1>/i;
-    const openThinkRe = /<(?:think|thinking|thought|reasoning|reason|redacted_reasoning|analysis|scratchpad|inner_monologue|reflection)\b/i;
+    // 必须独立成行，避免「请使用 <msg>…</msg>」这类举例被当成气泡
+    const tagRe = /(?:^|\n)[ \t]*<(msg|voice)\b[^>]*>([\s\S]*?)<\/\1>/i;
 
     const takeClosedThinking = () => {
         const extracted = extractThinkingFromText(buf, { allowUnclosed: false });
@@ -4826,33 +4905,33 @@ function createTagStreamParser(onBubble) {
         buf = extracted.clean;
     };
 
-    /** 已能看到 msg/voice 时，把前面的未闭合思维块收干净 */
-    const takeUnclosedThinkingBeforeMsg = () => {
-        if (!openThinkRe.test(buf)) return;
-        if (!/<(?:msg|voice)\b/i.test(buf)) return;
-        const extracted = extractThinkingFromText(buf, { allowUnclosed: true });
+    /** 若已出现成行尾部气泡，且前面还有未闭合思维，则先收思维 */
+    const takeUnclosedThinkingBeforeTrailingBubbles = () => {
+        if (unclosedThinkDepth(buf) <= 0) return;
+        const trailAt = findTrailingBubbleRegionStart(buf);
+        if (trailAt < 0) return;
+        const head = buf.slice(0, trailAt);
+        const extracted = extractThinkingFromText(head, { allowUnclosed: true });
         if (extracted.thinking) thinking = mergeThinkingParts(thinking, extracted.thinking);
-        buf = extracted.clean;
+        // head 里不应再残留成行气泡；拼回尾部气泡区
+        buf = `${extracted.clean}\n${buf.slice(trailAt)}`.replace(/^\n+/, '');
     };
 
     const drain = async () => {
         takeClosedThinking();
-        takeUnclosedThinkingBeforeMsg();
+        takeUnclosedThinkingBeforeTrailingBubbles();
         while (true) {
             const m = buf.match(tagRe);
             if (!m || m.index == null) break;
-            // 标签前若还夹着 think 开标签，先收掉
-            if (m.index > 0 && openThinkRe.test(buf.slice(0, m.index))) {
-                const head = buf.slice(0, m.index);
-                const extracted = extractThinkingFromText(head, { allowUnclosed: true });
-                if (extracted.thinking) thinking = mergeThinkingParts(thinking, extracted.thinking);
-                buf = `${extracted.clean}${buf.slice(m.index)}`.replace(/^\n+/, '');
-                continue;
-            }
+
+            // 仍在未闭合思维块内：哪怕匹配到成行 <msg>，也先等思维收束（或 end 时再拆尾部）
+            const before = buf.slice(0, m.index);
+            if (unclosedThinkDepth(before) > 0) break;
+
             const full = m[0];
             const tag = m[1].toLowerCase();
             const body = String(m[2] || '').trim();
-            buf = buf.slice(m.index + full.length);
+            buf = buf.slice(m.index + full.length).replace(/^\n/, '');
             if (!body) continue;
             emitted += 1;
             await onBubble({
@@ -4876,11 +4955,12 @@ function createTagStreamParser(onBubble) {
             const rest = restExtract.clean.trim();
             buf = '';
             if (!rest) return emitted;
-            if (!emitted) {
-                for (const b of parsePhoneReply(rest)) {
-                    emitted += 1;
-                    await onBubble(b);
-                }
+            const hasTagged = /(?:^|\n)[ \t]*<(?:msg|voice)\b/i.test(rest);
+            // 已出过泡时：只继续吐剩余标签泡，避免把说明残片按纯文本拆成假气泡
+            if (emitted > 0 && !hasTagged) return emitted;
+            for (const b of parsePhoneReply(rest)) {
+                emitted += 1;
+                await onBubble(b);
             }
             return emitted;
         },
@@ -5825,13 +5905,14 @@ async function generateModelReply(userTexts, opts = {}) {
         activeThread.splice(writeAt, 0, msg);
         writeAt += 1;
         persistThread();
-        renderMessages({ animateIdx: at });
+        renderMessages({ animateIdx: at, forceBottom: true });
         // 强制让出：否则多个气泡会在同一渲染周期里一起出现
         await yieldToPaint();
         // 不再逐条同步主聊天；离开小手机时整段一轮注入
     };
 
     try {
+        scrollMessagesToBottom();
         setTypingIndicator(true);
         const userBundle = users.map((t, i) => `${i + 1}. ${t}`).join('\n');
         const settings = getSettings();
@@ -5914,7 +5995,7 @@ async function requestModelReply() {
         activeThread.push({ role: 'user', text: draft, ts: Date.now(), pending: true });
         if (input) input.value = '';
         persistThread();
-        renderMessages();
+        renderMessages({ forceBottom: true });
     }
 
     const pending = collectPendingUserTexts();
@@ -5923,6 +6004,7 @@ async function requestModelReply() {
         return;
     }
 
+    scrollMessagesToBottom();
     await generateModelReply(pending);
 }
 
