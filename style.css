@@ -1,6 +1,9 @@
-/* Pocket Phone — fullscreen H5, LINE light pink/mint */
+/* Pocket Phone — fullscreen H5
+ * 设计 token 唯一源：颜色 / 字号 / 字重都从这里改，各界面只继承，不要再各写一套。
+ */
 
 :root {
+    /* 短信主色：粉 + 薄荷绿 */
     --pp-pink: #ff8fb5;
     --pp-pink-deep: #ff5c9a;
     --pp-mint: #7ddec0;
@@ -8,11 +11,65 @@
     --pp-line-green: #06c755;
     --pp-bg: #f7f8fa;
     --pp-panel: #ffffff;
-    --pp-text: #222222;
-    --pp-muted: #8b93a1;
+    --pp-text: #111111;
+    --pp-muted: #3a3a3a;
     --pp-border: #e8ebf0;
     --pp-user-bubble: #7ddec0;
     --pp-char-bubble: #ffffff;
+
+    /* 预设页独立色调（暖杏，刻意区别于酒馆浅绿） */
+    --pp-preset-bg: #faf6f1;
+    --pp-preset-panel: #fffaf4;
+    --pp-preset-border: #e5d4c4;
+    --pp-preset-accent: #c45c26;
+    --pp-preset-accent-soft: #f0dcc8;
+    --pp-preset-text: #1a1410;
+
+    /* 字体：跟酒馆主界面同一套族；字号档位集中在这里 */
+    --pp-font: inherit;
+    --pp-font-fa: "Font Awesome 6 Free", "Font Awesome 6 Pro";
+    --pp-fs-base: calc(var(--mainFontSize, 15px));
+    --pp-fs-sm: calc(var(--mainFontSize, 15px) - 2px);
+    --pp-fs-lg: calc(var(--mainFontSize, 15px) + 2px);
+    --pp-fw-regular: 400;
+    --pp-fw-medium: 500;
+    --pp-fw-semibold: 600;
+    --pp-fw-bold: 700;
+    --pp-lh: 1.45;
+}
+
+/* 全小手机统一字体级联：子界面禁止各自再设 font-family（图标除外） */
+#pocket-phone-root,
+#pocket-phone-root .pocket-phone-device,
+#pocket-phone-root .pocket-phone-screen {
+    font-family: var(--pp-font) !important;
+    font-size: var(--pp-fs-base);
+    font-weight: var(--pp-fw-regular);
+    line-height: var(--pp-lh);
+    color: var(--pp-text);
+    -webkit-font-smoothing: auto !important;
+    -moz-osx-font-smoothing: auto !important;
+    text-rendering: auto !important;
+    text-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+#pocket-phone-root *:not(.fa-solid):not(.fa-regular):not(.fa-brands):not([class*="fa-"]) {
+    font-family: inherit !important;
+    -webkit-font-smoothing: auto !important;
+    text-shadow: none !important;
+}
+
+#pocket-phone-root .fa-solid,
+#pocket-phone-root .fa-regular,
+#pocket-phone-root .fa-brands,
+#pocket-phone-root [class*="fa-"] {
+    font-family: var(--pp-font-fa) !important;
+    -webkit-font-smoothing: antialiased !important;
+    filter: none !important;
+    text-shadow: none !important;
 }
 
 #pocket-phone-fab {
@@ -52,6 +109,19 @@
     color: var(--pp-pink-deep);
 }
 
+#pocket_phone_topbar {
+    display: flex;
+    align-items: center;
+}
+
+#pocket_phone_topbar .drawer-icon {
+    cursor: pointer;
+}
+
+#pocket_phone_topbar .drawer-icon:hover {
+    filter: brightness(1.15);
+}
+
 #pocket-phone-root {
     position: fixed !important;
     top: 0 !important;
@@ -69,6 +139,17 @@
     margin: 0 !important;
     transform: none !important;
     inset: auto !important;
+    /* 让内部编辑弹层 absolute 相对小手机定位 */
+    isolation: isolate;
+    /* 切断酒馆主题模糊/滤镜，避免整页发虚 */
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    text-shadow: none !important;
+    -webkit-font-smoothing: auto !important;
+    -moz-osx-font-smoothing: auto !important;
+    font-family: inherit !important;
+    color: #111111;
 }
 
 #pocket-phone-root.pocket-phone-open {
@@ -96,11 +177,23 @@
 }
 
 .pocket-phone-screen {
+    position: relative;
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: var(--pp-bg);
+    background: #ffffff;
+    color: var(--pp-text);
+    font-size: var(--pp-fs-base);
+    font-weight: var(--pp-fw-regular);
+    line-height: var(--pp-lh);
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
+    text-rendering: auto;
+    text-shadow: none;
+    filter: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .pocket-phone-topbar {
@@ -140,41 +233,49 @@
 }
 
 .pocket-phone-top-meta .name {
-    font-weight: 700;
-    font-size: 15px;
+    font-weight: var(--pp-fw-semibold);
+    font-size: var(--pp-fs-lg);
+    color: var(--pp-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.pocket-phone-top-meta .sub {
-    font-size: 11px;
-    color: var(--pp-muted);
-}
-
-.pocket-phone-tabs {
+/* 顶栏右侧：酒馆风格功能图标一排（可继续加朋友圈等） */
+.pocket-phone-icon-tabs {
     display: flex;
-    gap: 0;
-    background: #fff;
-    border-bottom: 1px solid var(--pp-border);
+    align-items: center;
+    gap: 2px;
     flex-shrink: 0;
+    margin-left: 4px;
 }
 
-.pocket-phone-tabs button {
-    flex: 1;
+.pp-icon-tab {
+    width: 34px;
+    height: 34px;
     border: none;
+    border-radius: 10px;
     background: transparent;
-    padding: 10px 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--pp-muted);
+    color: #6b6b70;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
 }
 
-.pocket-phone-tabs button.active {
+.pp-icon-tab i {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.pp-icon-tab.active {
     color: var(--pp-pink-deep);
-    border-bottom-color: var(--pp-mint-deep);
+    background: rgba(255, 92, 154, 0.12);
+}
+
+.pp-icon-tab:active {
+    transform: scale(0.96);
 }
 
 .pocket-phone-view {
@@ -194,7 +295,8 @@
     padding: 14px 12px 10px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    align-items: stretch;
     background:
         radial-gradient(circle at 12% 8%, rgba(255, 143, 181, 0.12), transparent 36%),
         radial-gradient(circle at 88% 0%, rgba(125, 222, 192, 0.16), transparent 34%),
@@ -202,28 +304,55 @@
 }
 
 .pocket-phone-bubble {
+    display: block;
+    box-sizing: border-box;
     max-width: 78%;
+    width: auto;
+    height: auto;
     padding: 10px 12px;
     border-radius: 18px;
-    font-size: 14px;
-    line-height: 1.45;
+    font-size: var(--pp-fs-base);
+    font-weight: var(--pp-fw-regular);
+    color: var(--pp-text);
+    line-height: var(--pp-lh);
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
     word-break: break-word;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: none;
+    overflow: visible;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
-.pocket-phone-bubble.user {
+/* 新气泡逐条入场（只打在刚插入的那一条上） */
+.pp-bubble-enter {
+    animation: pp-bubble-pop 0.28s ease-out both;
+}
+
+@keyframes pp-bubble-pop {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.pocket-phone-bubble.pp-role-user {
     align-self: flex-end;
     background: var(--pp-user-bubble);
     color: #12352b;
     border-bottom-right-radius: 6px;
 }
 
-.pocket-phone-bubble.user.pending {
+.pocket-phone-bubble.pp-role-user.pending {
     outline: 1px dashed rgba(6, 199, 85, 0.45);
 }
 
-.pocket-phone-bubble.char {
+.pocket-phone-bubble.pp-role-char {
     align-self: flex-start;
     background: var(--pp-char-bubble);
     color: var(--pp-text);
@@ -231,7 +360,7 @@
     border-bottom-left-radius: 6px;
 }
 
-.pocket-phone-bubble.voice {
+.pocket-phone-bubble.pp-role-voice {
     align-self: flex-start;
     background: #fff8fb;
     border: 1px solid #ffd0e1;
@@ -239,102 +368,950 @@
     border-bottom-left-radius: 6px;
 }
 
-.pocket-phone-bubble.meta {
+/* 思维链：气泡左上角小图标 + 展开面板 */
+.pocket-phone-bubble.has-thinking {
+    position: relative;
+    padding-top: 18px;
+}
+
+.pp-think-btn {
+    position: absolute;
+    top: 4px;
+    left: 8px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(90, 110, 140, 0.12);
+    color: #6a7a92;
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.78;
+    transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.pp-think-btn:hover,
+.pp-think-btn:focus-visible {
+    opacity: 1;
+    background: rgba(90, 110, 140, 0.2);
+    color: #4a5a72;
+    outline: none;
+}
+
+.pp-think-btn.is-open {
+    opacity: 1;
+    background: rgba(90, 110, 140, 0.22);
+    color: #3d4f6a;
+}
+
+.pp-think-btn i {
+    pointer-events: none;
+    font-size: 9px;
+}
+
+.pp-think-panel {
+    display: none;
+    margin: 2px 0 8px;
+    padding: 8px 9px;
+    border-radius: 10px;
+    background: rgba(70, 82, 104, 0.06);
+    border: 1px solid rgba(70, 82, 104, 0.12);
+    max-height: 9.5em;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.pp-think-panel.is-open,
+.pp-think-panel:not([hidden]) {
+    display: block;
+}
+
+.pp-think-panel[hidden] {
+    display: none !important;
+}
+
+.pp-think-panel-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #7a8496;
+    margin-bottom: 4px;
+    user-select: none;
+}
+
+.pp-think-panel-body {
+    margin: 0;
+    padding: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #5a6474;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.pp-bubble-main {
+    display: block;
+    width: 100%;
+}
+
+.pocket-phone-bubble.pp-role-meta {
     align-self: center;
     background: transparent;
     box-shadow: none;
-    color: var(--pp-muted);
-    font-size: 12px;
+    color: #555555;
+    font-size: var(--pp-fs-sm);
+    font-weight: var(--pp-fw-regular);
     max-width: 92%;
 }
 
+/* —— LINE / 微信风格底栏 —— */
 .pocket-phone-composer {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: flex-end;
     gap: 8px;
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--pp-border);
-    background: #fff;
+    border-top: 1px solid #ebebeb;
+    background: #f7f7f8;
     flex-shrink: 0;
 }
 
+.pp-composer-input-wrap {
+    flex: 1;
+    min-width: 0;
+    background: #ffffff;
+    border: 1px solid #e2e2e5;
+    border-radius: 20px;
+    padding: 0 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.pocket-phone-composer textarea::placeholder {
+    color: #9a9aa0;
+    font-weight: 400;
+    opacity: 1;
+}
+
 .pocket-phone-composer textarea {
+    display: block;
     width: 100%;
     box-sizing: border-box;
     resize: none;
-    min-height: 44px;
+    min-height: 36px;
     max-height: 120px;
-    border-radius: 18px;
-    border: 1px solid var(--pp-border);
-    background: #f3f5f8;
+    height: 36px;
+    border: none;
+    border-radius: 20px;
+    background: transparent;
     color: var(--pp-text);
+    padding: 8px 12px;
+    font-size: var(--pp-fs-base);
+    font-weight: var(--pp-fw-regular);
+    line-height: 1.35;
+    outline: none;
+}
+
+.pp-composer-btn {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    text-shadow: none;
+    filter: none !important;
+    box-shadow: none;
+}
+
+.pp-composer-btn i {
+    font-size: 16px;
+    line-height: 1;
+    display: block;
+    filter: none !important;
+    text-shadow: none !important;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* 左侧：空心圆 +，进入更多整页 */
+.pp-composer-more {
+    background: #ffffff;
+    color: #222222;
+    border: 1.5px solid #cfcfd4;
+}
+
+.pp-composer-more i {
+    font-size: 15px;
+    font-weight: 900;
+}
+
+/* 右侧：实心浅色气泡图标，加入待发气泡 */
+.pp-composer-bubble {
+    background: #eef8f2;
+    color: #06c755;
+    border: none;
+}
+
+.pp-composer-bubble i {
+    font-size: 17px;
+}
+
+/* 发送 / 请求回复 */
+.pp-composer-send {
+    background: #06c755;
+    color: #ffffff;
+}
+
+.pp-composer-send i {
+    font-size: 14px;
+    transform: translateX(1px);
+}
+
+.pp-composer-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* 更多 / 总结记忆：整页网格（不再用底部弹层） */
+.pp-page-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111;
+    margin: 2px 0 4px;
+}
+
+.pp-page-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.pp-page-back {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: #f2f2f4;
+    color: #333;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.pp-page-back i {
+    font-size: 14px;
+}
+
+.pp-more-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 8px;
+    margin: 8px 0 4px;
+}
+
+.pp-more-grid-page {
+    margin-top: 14px;
+    gap: 16px 10px;
+    padding-bottom: 24px;
+}
+
+.pp-more-item {
+    border: none;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: #222;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: inherit;
+    -webkit-font-smoothing: auto;
+    text-shadow: none;
+}
+
+.pp-more-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.pp-more-icon i {
+    font-size: 20px;
+    filter: none !important;
+    text-shadow: none !important;
+}
+
+.pp-more-icon-new { color: #2f6fed; }
+.pp-more-icon-color { color: #d8891a; }
+.pp-more-icon-avatar { color: #b44ac0; }
+.pp-more-icon-voice { color: #0a9b6a; }
+.pp-more-icon-lang { color: #1a7fbf; }
+
+.pp-more-item-on .pp-more-icon {
+    outline: 2px solid rgba(26, 127, 191, 0.35);
+}
+
+/* 多语言：整段都在同一个气泡里，按文字自然撑开（别用 fit-content 收成一条） */
+.pocket-phone-bubble.has-i18n {
+    max-width: 82%;
+    min-width: 10.5em;
+    width: auto;
+    height: auto;
+    padding: 10px 12px 8px;
+    white-space: normal;
+    overflow: visible;
+}
+
+.pp-bubble-body {
+    display: block;
+    width: 100%;
+}
+
+.pp-bubble-original {
+    display: block;
+    color: #1f1f1f;
+    font-weight: 400;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.pp-i18n-wrap {
+    display: block;
+    margin-top: 8px;
+}
+
+.pp-i18n-wrap.is-collapsed .pp-i18n-divider,
+.pp-i18n-wrap.is-collapsed .pp-bubble-i18n {
+    display: none;
+}
+
+.pp-i18n-divider {
+    display: block;
+    border: none;
+    border-top: 1px dotted rgba(80, 80, 90, 0.35);
+    margin: 0 0 8px;
+    height: 0;
+}
+
+.pp-bubble-i18n {
+    display: block;
+    color: #6b6f76;
+    font-size: calc(var(--pp-fs-base) - 0.5px);
+    line-height: 1.45;
+    font-weight: 400;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.pp-i18n-toggle {
+    display: block;
+    width: max-content;
+    margin-left: auto;
+    margin-top: 6px;
+    border: none;
+    background: transparent;
+    color: #8a8f98;
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 0;
+    cursor: pointer;
+    text-align: right;
+}
+
+.pp-i18n-toggle:active {
+    color: #555;
+}
+
+/* 输入中三点 */
+.pocket-phone-bubble.pp-typing {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 5px;
+    min-width: 54px;
+    max-width: 78%;
+    width: auto;
+    padding: 12px 14px;
+}
+
+.pocket-phone-bubble.pp-typing span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #9aa0a8;
+    animation: pp-typing-bounce 1.2s infinite ease-in-out;
+}
+
+.pocket-phone-bubble.pp-typing span:nth-child(2) { animation-delay: 0.15s; }
+.pocket-phone-bubble.pp-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes pp-typing-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+    40% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* 双边头像气泡行 */
+.pp-msg-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    max-width: 100%;
+}
+
+.pp-msg-row.user {
+    flex-direction: row-reverse;
+    align-self: flex-end;
+}
+
+.pp-msg-row.char {
+    align-self: flex-start;
+}
+
+.pp-msg-main {
+    min-width: 0;
+    max-width: calc(100% - 44px);
+    flex: 0 1 auto;
+}
+
+.pp-msg-main .pocket-phone-bubble {
+    max-width: 100%;
+    width: auto;
+    align-self: auto;
+}
+
+.pp-msg-avatar,
+.pp-msg-avatar-empty,
+.pp-avatar-preview {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #ececf0;
+    border: 1px solid #e2e2e8;
+}
+
+.pp-msg-avatar-empty {
+    display: inline-block;
+}
+
+.pp-avatar-edit-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.pp-avatar-edit-card {
+    border: 1px solid #e6e6ea;
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+    background: #fafafa;
+}
+
+.pp-avatar-edit-title {
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 8px;
+}
+
+.pp-avatar-preview {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 8px;
+    display: block;
+}
+
+.pp-avatar-edit-card .pp-secondary-btn {
+    margin-top: 0;
+    font-size: 12px;
+    padding: 8px 10px;
+}
+
+.pp-more-icon-user { color: #3d6fd8; }
+
+.pp-persona-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 46vh;
+    overflow: auto;
+    margin-top: 8px;
+}
+
+.pp-persona-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: 1px solid #e6e6ea;
+    border-radius: 12px;
+    background: #fff;
+    padding: 8px 10px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.pp-persona-item.is-current {
+    border-color: #7ddec0;
+    background: #f3fffb;
+}
+
+.pp-persona-item img,
+.pp-persona-item .pp-msg-avatar-empty {
+    width: 40px;
+    height: 40px;
+}
+
+.pp-persona-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pp-persona-meta strong {
+    font-size: 14px;
+    color: #111;
+}
+
+.pp-persona-meta small {
+    font-size: 11px;
+    color: #888;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pp-persona-item em {
+    font-style: normal;
+    font-size: 11px;
+    color: #0a9b6a;
+}
+
+/* 气泡长按菜单 */
+.pp-bubble-menu {
+    position: absolute;
+    z-index: 60;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 124px;
+    padding: 6px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #e6e6ea;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+.pp-bubble-menu.pp-bubble-menu-open {
+    display: flex;
+}
+
+.pp-bubble-menu button {
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #222;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pp-bubble-menu button:hover,
+.pp-bubble-menu button:active {
+    background: #f3f3f5;
+}
+
+.pp-bubble-menu button i {
+    width: 14px;
+    text-align: center;
+    color: #666;
+}
+
+/* 通用小弹窗 */
+.pp-modal {
+    position: absolute;
+    inset: 0;
+    z-index: 70;
+    display: none;
+}
+
+.pp-modal.pp-modal-open {
+    display: block;
+}
+
+.pp-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.pp-modal-panel {
+    position: absolute;
+    left: 50%;
+    top: 46%;
+    transform: translate(-50%, -50%);
+    width: min(92%, 360px);
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+}
+
+.pp-modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #111;
+}
+
+.pp-modal-body label {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #555;
+}
+
+.pp-modal-body input[type="text"],
+.pp-modal-body input[type="color"],
+.pp-modal-body textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dddde2;
+    border-radius: 10px;
     padding: 10px 12px;
     font-size: 14px;
     font-family: inherit;
 }
 
-.pocket-phone-composer-actions {
-    display: flex;
+.pp-modal-body input[type="color"] {
+    padding: 4px;
+    height: 42px;
+}
+
+.pp-modal-body textarea {
+    min-height: 120px;
+    resize: vertical;
+    line-height: 1.45;
+}
+
+.pp-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
+    margin-top: 14px;
 }
 
-.pocket-phone-composer-actions button {
-    flex: 1;
-    border: none;
-    border-radius: 16px;
-    padding: 12px 10px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 14px;
+.pp-modal-actions .pp-primary-btn,
+.pp-modal-actions .pp-secondary-btn {
+    margin-top: 0;
 }
 
-#pocket-phone-add {
-    background: #fff;
-    color: var(--pp-pink-deep);
-    border: 1px solid #ffd0e1;
-}
-
-#pocket-phone-reply {
-    background: var(--pp-line-green);
-    color: #fff;
-}
-
-#pocket-phone-add:disabled,
-#pocket-phone-reply:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
 
 .pocket-phone-panel {
     padding: 16px;
     overflow-y: auto;
     gap: 10px;
+    background: #ffffff;
+    color: var(--pp-text);
+    font-size: var(--pp-fs-base);
+    font-weight: var(--pp-fw-regular);
 }
 
 .pocket-phone-panel label {
     display: block;
-    font-size: 13px;
+    font-size: var(--pp-fs-sm);
+    font-weight: var(--pp-fw-medium);
     margin-top: 10px;
-    color: var(--pp-muted);
+    color: #444444;
+    opacity: 1 !important;
 }
 
 .pocket-phone-panel input[type="text"],
 .pocket-phone-panel input[type="password"],
-.pocket-phone-panel textarea {
+.pocket-phone-panel input[type="number"],
+.pocket-phone-panel textarea,
+.pocket-phone-panel .pp-select {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid var(--pp-border);
+    border: 1px solid #dddde2;
     border-radius: 12px;
     padding: 10px 12px;
     margin-top: 4px;
-    font-size: 14px;
+    font-size: var(--pp-fs-base);
+    font-weight: var(--pp-fw-regular);
     background: #fff;
-    font-family: inherit;
     color: var(--pp-text);
+    opacity: 1 !important;
+}
+
+.pocket-phone-panel .pp-select {
+    appearance: auto;
+}
+
+.pp-section-title {
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px solid #ececf0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #222;
+}
+
+.pp-card {
+    margin: 4px 0 12px;
+    padding: 12px;
+    border: 1px solid #ececf0;
+    border-radius: 14px;
+    background: #fafafa;
+}
+
+.pp-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 4px;
+}
+
+.pp-card .pp-help {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.pp-card .pp-select {
+    margin-top: 0;
+}
+
+.pp-btn-row,
+.pp-btn-row-2 {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.pp-btn-row {
+    grid-template-columns: 1fr;
+}
+
+.pp-btn-row-2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.pp-btn-row-2:has(> :nth-child(3)) {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.pp-btn-row .pp-primary-btn,
+.pp-btn-row .pp-secondary-btn,
+.pp-btn-row-2 .pp-primary-btn,
+.pp-btn-row-2 .pp-secondary-btn,
+.pp-line-edit .pp-secondary-btn {
+    margin-top: 0;
+}
+
+.pp-line-edit {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 6px;
+    margin-top: 10px;
+    align-items: center;
+}
+
+.pp-line-edit input[type="text"] {
+    margin-top: 0;
+    min-width: 0;
+}
+
+.pp-line-edit .pp-secondary-btn {
+    width: auto;
+    padding: 10px 12px;
+    white-space: nowrap;
+}
+
+.pp-btn-danger {
+    color: #b42318 !important;
+    border-color: #f0c2c0 !important;
+}
+
+.pocket-phone-messages.pp-has-custom-bg {
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.55)),
+        var(--pp-chat-bg-image);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.pp-bg-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 8px 0 12px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.pp-bg-item {
+    position: relative;
+    aspect-ratio: 1;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    overflow: hidden;
+    padding: 0;
+    background: #f2f2f5;
+    cursor: pointer;
+}
+
+.pp-bg-item.is-active {
+    border-color: #06c755;
+}
+
+.pp-bg-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.pp-bg-item-default {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #666;
+}
+
+.pp-bg-item-del {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 14px;
+    line-height: 18px;
+    text-align: center;
+}
+
+.pp-more-icon-bg { color: #c45c2a; }
+.pp-more-icon-memory { color: #5b6fd8; }
+
+#pp-memory-prompt {
+    min-height: 140px;
+}
+
+#pp-memory-text {
+    width: 100%;
+    min-height: 160px;
+    box-sizing: border-box;
+    border: 1px solid #dddde2;
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.45;
+    resize: vertical;
+}
+
+#pp-memory-token-status {
+    margin: 6px 0 2px;
+}
+
+.pp-token-slider-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.pp-token-slider-row input[type="range"] {
+    width: 100%;
+    margin: 0;
+    accent-color: #06c755;
+}
+
+.pp-token-slider-val {
+    min-width: 52px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 600;
+    color: #222;
+    font-variant-numeric: tabular-nums;
+}
+
+.pp-mini-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #111;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.pp-mini-btn:active {
+    opacity: 0.85;
+}
+
+#pp-memory-custom-fields {
+    margin-top: 4px;
+}
+
+#pp-voice-prompt {
+    min-height: 180px;
+}
+
+#pp-voice-prompt-key-hint {
+    margin-top: 4px;
 }
 
 .pocket-phone-panel textarea {
-    min-height: 220px;
+    min-height: 160px;
     line-height: 1.45;
     resize: vertical;
 }
@@ -357,23 +1334,24 @@
 .pp-primary-btn,
 .pp-secondary-btn {
     border: none;
-    border-radius: 14px;
+    border-radius: 12px;
     padding: 12px 14px;
-    font-weight: 700;
+    font-weight: var(--pp-fw-semibold);
+    font-size: var(--pp-fs-base);
     cursor: pointer;
     width: 100%;
     margin-top: 10px;
 }
 
 .pp-primary-btn {
-    background: linear-gradient(90deg, var(--pp-pink-deep), var(--pp-mint-deep));
+    background: #06c755;
     color: #fff;
 }
 
 .pp-secondary-btn {
     background: #fff;
-    color: var(--pp-pink-deep);
-    border: 1px solid #ffd0e1;
+    color: #111;
+    border: 1px solid #dddde2;
 }
 
 .pocket-phone-settings .checkbox_label {
@@ -385,7 +1363,502 @@
 
 .pp-help {
     font-size: 12px;
-    color: var(--pp-muted);
+    font-weight: 400;
+    color: #666666;
     line-height: 1.45;
     margin: 6px 0 0;
+    -webkit-font-smoothing: auto;
+    text-shadow: none;
+    opacity: 1;
+}
+
+.pocket-phone-panel .pp-mode-row label {
+    font-size: 14px;
+    font-weight: 400;
+    color: #111111;
+    opacity: 1 !important;
+}
+
+/* —— 预设页：暖杏色调 + 真实挂载酒馆控件 —— */
+.pp-preset-view {
+    display: none;
+    flex-direction: column;
+    padding: 0 !important;
+    gap: 0 !important;
+    background: var(--pp-preset-bg);
+    color: var(--pp-preset-text);
+}
+
+.pocket-phone-view.pp-preset-view.active {
+    display: flex !important;
+}
+
+.pp-st-preset-mount {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 10px 12px 24px;
+    -webkit-overflow-scrolling: touch;
+    background:
+        linear-gradient(180deg, #fff8f0 0%, var(--pp-preset-bg) 48%, #f3ebe3 100%);
+    color: var(--pp-preset-text);
+    font-size: var(--pp-fs-base);
+    font-weight: var(--pp-fw-regular);
+}
+
+.pp-st-preset-mount .pp-st-preset-live {
+    display: block !important;
+    width: 100%;
+    max-width: 100%;
+}
+
+.pp-st-preset-mount #openai_api-presets,
+.pp-st-preset-mount #range_block_openai,
+.pp-st-preset-mount #openai_settings {
+    display: block !important;
+    visibility: visible !important;
+    background: transparent !important;
+    border-color: var(--pp-preset-border) !important;
+}
+
+.pp-st-preset-mount .text_pole,
+.pp-st-preset-mount select,
+.pp-st-preset-mount textarea,
+.pp-st-preset-mount input[type="text"],
+.pp-st-preset-mount input[type="number"],
+.pp-st-preset-mount label,
+.pp-st-preset-mount b,
+.pp-st-preset-mount strong,
+.pp-st-preset-mount small,
+.pp-st-preset-mount .range-block-title,
+.pp-st-preset-mount .toggle-description,
+.pp-st-preset-mount .completion_prompt_manager_prompt_name {
+    color: var(--pp-preset-text) !important;
+    opacity: 1 !important;
+}
+
+.pp-st-preset-mount .menu_button,
+.pp-st-preset-mount .menu_button.fa-solid {
+    color: var(--pp-preset-accent) !important;
+}
+
+.pp-st-preset-mount #completion_prompt_manager {
+    width: 100%;
+    background: var(--pp-preset-panel);
+    border: 1px solid var(--pp-preset-border);
+    border-radius: 12px;
+    padding: 8px;
+}
+
+/* 条目操作按钮：强制可见（编辑 / 开关 / 拖拽） */
+#pocket-phone-root #completion_prompt_manager_list li.completion_prompt_manager_prompt {
+    display: grid !important;
+    grid-template-columns: 22px minmax(0, 1fr) auto auto !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 6px 4px !important;
+    position: relative !important;
+    border-bottom: 1px solid var(--pp-preset-border) !important;
+    background: transparent !important;
+}
+
+#pocket-phone-root #completion_prompt_manager_list .drag-handle,
+#pocket-phone-root #completion_prompt_manager_list .drag-handle:not(.ui-sortable-handle) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: static !important;
+    height: auto !important;
+    width: 22px !important;
+    padding: 0 !important;
+    cursor: grab !important;
+    opacity: 1 !important;
+    color: var(--pp-preset-accent) !important;
+    font-size: 14px !important;
+    visibility: visible !important;
+}
+
+#pocket-phone-root #completion_prompt_manager_list .prompt_manager_prompt_controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 72px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#pocket-phone-root #completion_prompt_manager_list .prompt_manager_prompt_controls span,
+#pocket-phone-root #completion_prompt_manager_list .prompt_manager_prompt_controls .fa-solid {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    min-height: 22px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: var(--pp-preset-text) !important;
+    cursor: pointer !important;
+    filter: none !important;
+    font-family: var(--pp-font-fa) !important;
+    font-weight: 900 !important;
+    font-size: 14px !important;
+}
+
+#pocket-phone-root #completion_prompt_manager_list .prompt-manager-edit-action {
+    color: var(--pp-preset-accent) !important;
+}
+
+#pocket-phone-root #completion_prompt_manager_list .prompt-manager-toggle-action {
+    color: #8a5a2b !important;
+}
+
+#pocket-phone-root #completion_prompt_manager_list .completion_prompt_manager_prompt_disabled .prompt-manager-toggle-action {
+    color: #988878 !important;
+}
+
+.pp-st-preset-mount .completion_prompt_manager_prompt,
+.pp-st-preset-mount .prompt_manager_prompt {
+    cursor: grab;
+}
+
+/* 拖拽时：helper 必须可见，placeholder 留位，避免“拖一下就透明消失” */
+#pocket-phone-root .pp-sortable-helper,
+#pocket-phone-root .ui-sortable-helper {
+    opacity: 1 !important;
+    visibility: visible !important;
+    background: #fff8f0 !important;
+    color: #2a2118 !important;
+    border: 1px solid #e6d5c3 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18) !important;
+    z-index: 10050 !important;
+    pointer-events: none !important;
+}
+
+#pocket-phone-root #completion_prompt_manager_list .ui-sortable-placeholder {
+    visibility: visible !important;
+    background: rgba(138, 90, 43, 0.12) !important;
+    border: 1px dashed rgba(138, 90, 43, 0.45) !important;
+    border-radius: 8px !important;
+    min-height: 36px !important;
+}
+
+/*
+ * 提示词编辑/新建弹层：
+ * 必须显式 height（不能只靠 max-height），否则 jQuery slideDown + height:100% 子节点
+ * 会把弹层量成 ~36px，表单被裁掉。
+ */
+/* 弹层在 #pocket-phone-root 内；未打开必须隐藏，打开后盖住小手机内容 */
+#pocket-phone-root > #completion_prompt_manager_popup.pp-st-prompt-popup:not(.openDrawer),
+body.pp-st-preset-hosted #completion_prompt_manager_popup.pp-st-prompt-popup:not(.openDrawer) {
+    display: none !important;
+}
+
+#pocket-phone-root > #completion_prompt_manager_popup.pp-st-prompt-popup.openDrawer,
+body.pp-st-preset-hosted #completion_prompt_manager_popup.pp-st-prompt-popup.openDrawer {
+    z-index: 20 !important;
+    position: absolute !important;
+    left: 8px !important;
+    right: 8px !important;
+    top: 56px !important;
+    bottom: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    background: var(--pp-preset-panel) !important;
+    color: var(--pp-preset-text) !important;
+    border: 1px solid var(--pp-preset-border) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 12px 36px rgba(60, 30, 10, 0.22) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+    pointer-events: auto !important;
+}
+
+body.pp-st-preset-hosted #completion_prompt_manager_popup #completion_prompt_manager_popup_edit,
+body.pp-st-preset-hosted #completion_prompt_manager_popup #completion_prompt_manager_popup_inspect,
+#completion_prompt_manager_popup.pp-st-prompt-popup #completion_prompt_manager_popup_edit,
+#completion_prompt_manager_popup.pp-st-prompt-popup #completion_prompt_manager_popup_inspect {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: auto !important;
+}
+
+body.pp-st-preset-hosted #completion_prompt_manager_popup .completion_prompt_manager_popup_entry_form,
+#completion_prompt_manager_popup.pp-st-prompt-popup .completion_prompt_manager_popup_entry_form {
+    min-height: 0 !important;
+}
+
+body.pp-st-preset-hosted #completion_prompt_manager_popup #completion_prompt_manager_popup_entry_form_prompt,
+#completion_prompt_manager_popup.pp-st-prompt-popup #completion_prompt_manager_popup_entry_form_prompt {
+    min-height: 220px !important;
+}
+
+body.pp-st-preset-hosted #completion_prompt_manager_popup *:not(.fa-solid):not(.fa-regular):not([class*="fa-"]),
+#completion_prompt_manager_popup.pp-st-prompt-popup *:not(.fa-solid):not(.fa-regular):not([class*="fa-"]) {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    text-shadow: none !important;
+    -webkit-font-smoothing: auto !important;
+    font-family: inherit !important;
+}
+
+/* select2 下拉也要压过小手机 */
+body.pp-st-preset-hosted .select2-container--open {
+    z-index: 100450 !important;
+}
+
+/* —— 最近角色列表 —— */
+#pocket-phone-root.pp-on-roster .pocket-phone-avatar {
+    display: none;
+}
+
+.pp-roster-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.pp-roster-empty {
+    text-align: center;
+    padding: 28px 12px;
+    color: #888;
+}
+
+.pp-roster-item {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    border: 1px solid #ececf0;
+    border-radius: 14px;
+    background: #fafafa;
+    overflow: hidden;
+}
+
+.pp-roster-item.is-pinned {
+    border-color: #f5c2d4;
+    background: #fff7fa;
+}
+
+.pp-roster-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+}
+
+.pp-roster-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #ffe4ef;
+    border: 1px solid #fff;
+}
+
+.pp-roster-avatar-empty {
+    background: linear-gradient(135deg, #ffe4ef, #e8fff6);
+}
+
+.pp-roster-meta {
+    min-width: 0;
+    flex: 1;
+}
+
+.pp-roster-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #222;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pp-roster-pin-icon {
+    color: #e85a8c;
+    font-size: 11px;
+    margin-right: 4px;
+}
+
+.pp-roster-sub {
+    font-size: 12px;
+    color: #999;
+    margin-top: 1px;
+}
+
+.pp-roster-preview {
+    font-size: 12px;
+    color: #777;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pp-roster-actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 8px 6px 0;
+}
+
+.pp-roster-act {
+    width: 30px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pp-roster-act:hover,
+.pp-roster-act:active {
+    background: #f0f0f3;
+    color: #333;
+}
+
+.pp-roster-act-danger:hover,
+.pp-roster-act-danger:active {
+    background: #ffe8ee;
+    color: #c62828;
+}
+
+/*
+ * 小手机全屏时：toastr / ST dialog / 提示词弹层必须压在最上面。
+ * toast 可能被 JS 挂到 #pocket-phone-root 末尾（同层最高、不被 .device 裁切）。
+ */
+body.pocket-phone-open #toast-container,
+#pocket-phone-root.pocket-phone-open > #toast-container {
+    z-index: 2147483000 !important;
+    position: fixed !important;
+    pointer-events: none !important;
+    transform: none !important;
+    filter: none !important;
+}
+
+body.pocket-phone-open #toast-container > div,
+#pocket-phone-root.pocket-phone-open > #toast-container > div {
+    pointer-events: auto !important;
+}
+
+body.pocket-phone-open dialog.popup,
+body.pocket-phone-open dialog[open] {
+    z-index: 2147483000 !important;
+}
+
+/* 未托管进小手机的提示词弹层 */
+body.pocket-phone-open #completion_prompt_manager_popup.openDrawer:not(.pp-st-prompt-popup) {
+    z-index: 2147482900 !important;
+    position: fixed !important;
+}
+
+/* 多语言选择 */
+.pp-lang-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.pp-lang-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid #dddde2;
+    border-radius: 12px;
+    background: #f7f7f9;
+    color: #222;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.pp-lang-item small {
+    color: #888;
+    font-size: 12px;
+}
+
+.pp-lang-item.is-active {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    box-shadow: inset 0 0 0 1px #3b82f6;
+}
+
+.pp-lang-item[data-lang=""] {
+    grid-column: 1 / -1;
+}
+
+/* 对话切换列表 */
+.pp-thread-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 240px;
+    overflow: auto;
+    margin-top: 8px;
+}
+
+.pp-thread-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #dddde2;
+    border-radius: 12px;
+    background: #f7f7f9;
+    color: #222;
+    text-align: left;
+    cursor: pointer;
+}
+
+.pp-thread-item .pp-thread-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.pp-thread-item small {
+    color: #888;
+    font-size: 12px;
+}
+
+.pp-thread-item.is-active {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+#pp-thread-new {
+    width: 100%;
+    margin: 8px 0 4px;
 }

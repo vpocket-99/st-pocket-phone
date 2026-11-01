@@ -17,6 +17,12 @@
 {{char_personality}}
 {{char_scenario}}
 
+【角色开场白｜first_mes】
+{{char_first_mes}}
+
+【酒馆主聊天近期上下文】
+{{main_chat_history}}
+
 【最近短信】
 {{sms_history}}
 
