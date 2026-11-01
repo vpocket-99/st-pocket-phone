@@ -11,10 +11,15 @@ import { setUserAvatar, user_avatar, getUserAvatar } from '../../../personas.js'
 const MODULE_NAME = 'st-pocket-phone';
 const EXTENSION_FOLDER = `scripts/extensions/third-party/${MODULE_NAME}`;
 /** 升级 UI 结构时递增，确保旧 DOM 被重建 */
-const PP_UI_VERSION = '32';
+const PP_UI_VERSION = '33';
 const PP_EXPORT_VERSION = 1;
 /** 导入/压缩触发阈值默认值（可在总结记忆页改） */
 const DEFAULT_MEMORY_TOKEN_LIMIT = 10000;
+/**
+ * 小手机预设池名前缀：从主库拉「A」时生成独立副本「📱 A」，
+ * 编辑副本不影响外面同名预设 A。
+ */
+const PP_PHONE_PRESET_PREFIX = '📱 ';
 
 /** AIRP 向：聚焦情感互动与有趣梗的默认压缩提示词 */
 const DEFAULT_MEMORY_SUMMARY_PROMPT = `你是 AIRP / 情感向角色扮演的记忆编辑。请将「手机短信记录」压缩为可继续扮演的长期记忆摘要。
@@ -147,16 +152,16 @@ const defaultSettings = Object.freeze({
     apiModel: '',
     apiHint: '',
     presetPrompt: '',
-    /** 小手机当前选用的预设名（B），只记在扩展设置里 */
+    /** 小手机当前选用的预设名（优先为「📱 xxx」池内副本），只记在扩展设置里 */
     phonePresetName: '',
     /**
      * 进入小手机前主聊天正在用的预设名（A）。
-     * 用于刷新/崩溃后把酒馆全局选中项掰回主聊天，避免和 B 串台。
+     * 用于刷新/崩溃后把酒馆全局选中项掰回主聊天，避免和手机池串台。
      */
     outsidePresetName: '',
-    /** true=曾经借用全局预设切到 B，但还没干净还原 A（刷新中断等） */
+    /** true=曾经借用全局预设切到手机池，但还没干净还原 A（刷新中断等） */
     phoneSessionBorrowed: false,
-    /** 小手机自有预设库存：name → 完整预设 JSON（不写入酒馆 OpenAI 预设库逻辑以外的混用） */
+    /** 小手机自有预设库存备份：name → 完整预设 JSON（扩展设置；主库另有 📱 副本文件） */
     phonePresets: {},
     /** 气泡颜色（短信页） */
     bubbleColors: {
@@ -1279,6 +1284,7 @@ function ensureUi() {
                 </div>
 
                 <div class="pocket-phone-view pocket-phone-panel pp-preset-view" data-view="preset">
+                    <p class="pp-help pp-preset-pool-hint">小手机使用独立预设池：在下方选主库「A」会自动生成副本「📱 A」，编辑副本不会改外面的 A。可随时切换其它「📱」预设。</p>
                     <div id="pp-st-preset-mount" class="pp-st-preset-mount"></div>
                 </div>
 
@@ -1661,6 +1667,116 @@ function getOpenaiPresetManager() {
     }
 }
 
+function isPhonePoolPresetName(name) {
+    return String(name || '').startsWith(PP_PHONE_PRESET_PREFIX);
+}
+
+function toPhonePoolPresetName(baseName) {
+    const n = String(baseName || '').trim();
+    if (!n) return '';
+    if (isPhonePoolPresetName(n)) return n;
+    return `${PP_PHONE_PRESET_PREFIX}${n}`;
+}
+
+function phonePoolSourceName(phoneName) {
+    const n = String(phoneName || '').trim();
+    if (isPhonePoolPresetName(n)) return n.slice(PP_PHONE_PRESET_PREFIX.length);
+    return n;
+}
+
+function presetNameExists(name) {
+    const pm = getOpenaiPresetManager();
+    if (!pm || !name) return false;
+    try {
+        const value = pm.findPreset(name);
+        return value !== undefined && value !== null && value !== '';
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * 把主库预设 sourceName 复制为小手机池「📱 sourceName」（已存在则不覆盖，保护手机侧已有修改）。
+ * @param {string} sourceName
+ * @returns {Promise<string>} 池内副本名
+ */
+async function ensurePhonePoolCloneFrom(sourceName) {
+    const src = String(sourceName || '').trim();
+    if (!src) throw new Error('缺少源预设名');
+    const cloneName = toPhonePoolPresetName(src);
+    const pm = getOpenaiPresetManager();
+    if (!pm) throw new Error('找不到 Chat Completion 预设管理器');
+
+    if (presetNameExists(cloneName)) return cloneName;
+
+    let settings = null;
+    try {
+        settings = pm.getCompletionPresetByName?.(src) || null;
+    } catch {
+        settings = null;
+    }
+    if (!settings) {
+        // 源就是当前选中项时，用运行时设置兜底
+        const cur = getCurrentPresetSnapshot()?.name;
+        if (cur === src && getContext().chatCompletionSettings) {
+            try {
+                settings = structuredClone(getContext().chatCompletionSettings);
+            } catch {
+                settings = { ...getContext().chatCompletionSettings };
+            }
+        }
+    } else {
+        try {
+            settings = structuredClone(settings);
+        } catch {
+            settings = JSON.parse(JSON.stringify(settings));
+        }
+    }
+    if (!settings || typeof settings !== 'object') {
+        throw new Error(`无法读取预设「${src}」的内容`);
+    }
+
+    const prevIgnore = ignoringPresetChange;
+    ignoringPresetChange = true;
+    try {
+        await pm.savePreset(cloneName, settings);
+    } finally {
+        // selectPresetByName 会自己管 ignoring；这里先恢复，随后 select 再锁
+        ignoringPresetChange = prevIgnore;
+    }
+    return cloneName;
+}
+
+/**
+ * 选用小手机池预设：主库名会先克隆再选中；池内名直接选中。
+ * @param {string} name
+ * @param {{ fromUser?: boolean }} [opts]
+ */
+async function activatePhonePresetSelection(name, opts = {}) {
+    const raw = String(name || '').trim();
+    if (!raw) return '';
+    const s = getSettings();
+    let target = raw;
+    if (!isPhonePoolPresetName(raw)) {
+        target = await ensurePhonePoolCloneFrom(raw);
+        toastr?.info?.(`已为小手机创建副本「${target}」（不影响外面的「${raw}」）`);
+    }
+    const ok = selectPresetByName(target);
+    if (!ok) {
+        toastr?.warning?.(`无法切换到小手机预设「${target}」`);
+        return '';
+    }
+    s.phonePresetName = target;
+    snapshotActivePresetIntoPhoneStore(target);
+    persistSettingsNow();
+    setTimeout(() => ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true }), 80);
+    setTimeout(() => ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true }), 400);
+    if (opts.fromUser) {
+        console.info('[st-pocket-phone] phone preset →', target, opts.fromUser ? '(user)' : '');
+    }
+    return target;
+}
+
 function getCurrentPresetSnapshot() {
     const pm = getOpenaiPresetManager();
     if (!pm) return null;
@@ -1800,19 +1916,17 @@ function ensurePocketPhonePresetEntriesIfOnPhone(opts = {}) {
     return ensurePocketPhonePresetEntries(opts);
 }
 
-/** 把当前已加载的预设运行时快照写入小手机扩展库存（extensionSettings，不跟外面聊天会话绑死） */
+/** 把当前已加载的手机池预设运行时快照写入扩展库存 */
 function snapshotActivePresetIntoPhoneStore(name) {
-    if (!name) return;
-    // 绝不在主聊天预设 A 上做库存快照，避免把 A 误记成 B
-    if (!phoneSessionActive) return;
-    if (getSettings().outsidePresetName && name === getSettings().outsidePresetName
-        && name !== getSettings().phonePresetName) {
-        return;
-    }
+    if (!name || !phoneSessionActive) return;
+    // 只快照手机池副本或已记录的 phonePreset；绝不把外面主库 A 误存成手机预设
+    const outside = String(getSettings().outsidePresetName || outsidePresetSnapshot?.name || '').trim();
+    if (outside && name === outside && !isPhonePoolPresetName(name)) return;
     try {
         const ctx = getContext();
         const pm = getOpenaiPresetManager();
         const selected = pm?.getSelectedPresetName?.() || name;
+        if (outside && selected === outside && !isPhonePoolPresetName(selected)) return;
         const live = ctx.chatCompletionSettings ? structuredClone(ctx.chatCompletionSettings) : null;
         if (!live) return;
         const s = getSettings();
@@ -1820,6 +1934,7 @@ function snapshotActivePresetIntoPhoneStore(name) {
         s.phonePresets[selected] = {
             savedAt: Date.now(),
             name: selected,
+            source: phonePoolSourceName(selected),
             settings: live,
         };
         s.phonePresetName = selected;
@@ -1829,36 +1944,42 @@ function snapshotActivePresetIntoPhoneStore(name) {
     }
 }
 
+/** 用户在小手机预设下拉里点选时置位，用来区分「手切」与「切角色误拽」 */
+let ppPresetUserGesture = false;
+
 function bindPhonePresetTracker() {
     if (window.__pp_preset_tracker) return;
     window.__pp_preset_tracker = true;
+
+    $(document).on('pointerdown.pocketphone', '#pp-st-preset-mount #settings_preset_openai, #pocket-phone-root #settings_preset_openai', () => {
+        ppPresetUserGesture = true;
+    });
+
     $(document).on('change.pocketphone', '#settings_preset_openai', () => {
         if (!phoneSessionActive || ignoringPresetChange) return;
-        // 用户在小手机里手切预设时，酒馆若开了「绑定连接」会改 API —— 立刻掰回外面连接
         if (outsideConnectionSnapshot) restoreConnectionSettings(outsideConnectionSnapshot);
-        const name = getOpenaiPresetManager()?.getSelectedPresetName?.();
+
+        const name = String(getOpenaiPresetManager()?.getSelectedPresetName?.() || '').trim();
         if (!name) return;
         const s = getSettings();
-        const outside = String(s.outsidePresetName || outsidePresetSnapshot?.name || '').trim();
         const wanted = String(s.phonePresetName || '').trim();
+        const fromUser = ppPresetUserGesture;
+        ppPresetUserGesture = false;
 
-        // 切角色 / 角色绑定预设 等会把全局选中项拽离 B：绝不把误切结果写成新的 B，立刻拉回
-        if (outside && name === outside) {
-            if (wanted) setTimeout(() => {
-                if (!phoneSessionActive || ignoringPresetChange) return;
-                if (getCurrentPresetSnapshot()?.name !== wanted) selectPresetByName(wanted);
-            }, 0);
+        // 主库预设（无 📱 前缀）：用户手选 → 拉成手机池副本；误拽 → 拉回当前手机预设
+        if (!isPhonePoolPresetName(name)) {
+            if (fromUser) {
+                void activatePhonePresetSelection(name, { fromUser: true });
+            } else if (wanted) {
+                setTimeout(() => {
+                    if (!phoneSessionActive || ignoringPresetChange) return;
+                    if (getCurrentPresetSnapshot()?.name !== wanted) selectPresetByName(wanted);
+                }, 0);
+            }
             return;
         }
-        if (wanted && name !== wanted) {
-            setTimeout(() => {
-                if (!phoneSessionActive || ignoringPresetChange) return;
-                if (getCurrentPresetSnapshot()?.name !== wanted) selectPresetByName(wanted);
-            }, 0);
-            return;
-        }
 
-        // 仅当当前就是已记录的 B，或尚未指定 B（用户在预设页首次选定）时，才更新 B
+        // 已在手机池内：允许自由切换，记下新的 B
         s.phonePresetName = name;
         snapshotActivePresetIntoPhoneStore(name);
         persistSettingsNow();
@@ -1866,11 +1987,21 @@ function bindPhonePresetTracker() {
     });
 }
 
-/** 刷新后预设列表可能尚未就绪，多次重试切到小手机预设 B；成功后再补齐条目 */
+/** 进入小手机后切到已记录的手机池预设；同名冲突时自动生成 📱 副本 */
 function restorePhonePresetWithRetry() {
-    const wanted = String(getSettings().phonePresetName || '').trim();
+    const s = getSettings();
+    let wanted = String(s.phonePresetName || '').trim();
+    const outside = String(s.outsidePresetName || outsidePresetSnapshot?.name || '').trim();
+
+    // 旧数据：手机预设名居然等于外面 A → 改成池内副本名
+    if (wanted && outside && wanted === outside && !isPhonePoolPresetName(wanted)) {
+        wanted = toPhonePoolPresetName(wanted);
+        s.phonePresetName = wanted;
+        persistSettingsNow();
+    }
+
     if (!wanted) {
-        toastr?.info?.('请到「预设」页选一个短信专用预设；之后进入会自动切到它');
+        toastr?.info?.('请到「预设」页选择预设；选主库同名项会自动生成「📱」小手机副本');
         return;
     }
 
@@ -1882,9 +2013,19 @@ function restorePhonePresetWithRetry() {
             ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true });
             return true;
         }
+        // 池内副本尚不存在：从源名克隆
+        if (isPhonePoolPresetName(wanted) && !presetNameExists(wanted)) {
+            const src = phonePoolSourceName(wanted);
+            if (src && presetNameExists(src)) {
+                void activatePhonePresetSelection(src).then((got) => {
+                    if (got) wanted = got;
+                });
+                return true;
+            }
+            return false;
+        }
         const ok = selectPresetByName(wanted);
         if (ok) {
-            // select 异步落地后再补齐，避免写到 A
             setTimeout(() => ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true }), 80);
             setTimeout(() => ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true }), 400);
             return true;
@@ -1907,8 +2048,8 @@ function restorePhonePresetWithRetry() {
 }
 
 /**
- * 进入小手机会话：持久化外面 A，再临时切到 B（不改连接）。
- * A 写入 extensionSettings，刷新后也能还原，避免主聊天被粘成小手机预设。
+ * 进入小手机会话：记下外面 A，再切到手机池预设（不改连接）。
+ * 手机侧使用「📱」副本，可与外面同名源并存且互不覆盖。
  */
 function enterPhonePresetSession() {
     bindPhonePresetTracker();
@@ -1922,17 +2063,19 @@ function enterPhonePresetSession() {
         const s = getSettings();
         const outsideName = String(outsidePresetSnapshot?.name || '').trim();
         const phoneName = String(s.phonePresetName || '').trim();
-        // 若当前已经停在 B（上次刷新没还原），绝不能把 B 误记成「外面 A」
-        if (outsideName && outsideName !== phoneName) {
+        // 当前停在手机池预设上时，不能把池内名误记成「外面 A」
+        if (outsideName && !isPhonePoolPresetName(outsideName) && outsideName !== phoneName) {
+            s.outsidePresetName = outsideName;
+        } else if (outsideName && isPhonePoolPresetName(outsideName)) {
+            // 上次没还原干净，外面名不可信；保留已有 outsidePresetName
+        } else if (outsideName && outsideName === phoneName && !isPhonePoolPresetName(outsideName)) {
             s.outsidePresetName = outsideName;
         }
-        // 否则保留已有 outsidePresetName，供退出/启动 heal 使用
         s.phoneSessionBorrowed = true;
         persistSettingsNow();
 
         const oai = getContext().chatCompletionSettings || {};
         oai.__pp_prev_bind = !!oai.bind_preset_to_connection;
-        // 会话期间关掉绑定，避免任何预设切换改 API
         oai.bind_preset_to_connection = false;
         const bindEl = /** @type {HTMLInputElement|null} */ (document.getElementById('bind_preset_to_connection'));
         if (bindEl) bindEl.checked = false;
@@ -1956,17 +2099,27 @@ function bindPresetAfterGuard() {
             if (outsideConnectionSnapshot) restoreConnectionSettings(outsideConnectionSnapshot);
             const oai = getContext().chatCompletionSettings || {};
             oai.bind_preset_to_connection = false;
-            const wanted = String(getSettings().phonePresetName || '').trim();
-            const cur = getCurrentPresetSnapshot()?.name;
-            // 会话中若被拽离 B（切角色等），强制拉回
-            if (wanted && cur && cur !== wanted && !ignoringPresetChange) {
-                setTimeout(() => {
-                    if (!phoneSessionActive) return;
-                    if (getCurrentPresetSnapshot()?.name !== wanted) selectPresetByName(wanted);
-                }, 0);
+            const s = getSettings();
+            const wanted = String(s.phonePresetName || '').trim();
+            const cur = String(getCurrentPresetSnapshot()?.name || '').trim();
+            if (ignoringPresetChange) return;
+
+            // 被拽到主库预设：拉回当前手机池预设（用户手切会走 tracker 克隆）
+            if (cur && !isPhonePoolPresetName(cur)) {
+                if (wanted) {
+                    setTimeout(() => {
+                        if (!phoneSessionActive || ignoringPresetChange) return;
+                        if (getCurrentPresetSnapshot()?.name !== wanted) selectPresetByName(wanted);
+                    }, 0);
+                }
                 return;
             }
-            // 仅当已经切到 B 才补齐强制条目，绝不写进主聊天 A
+
+            // 已在手机池：若与记录不同，视为合法切换（例如 updateList 后）
+            if (cur && isPhonePoolPresetName(cur) && cur !== wanted) {
+                s.phonePresetName = cur;
+                snapshotActivePresetIntoPhoneStore(cur);
+            }
             setTimeout(() => ensurePocketPhonePresetEntriesIfOnPhone({ render: true, save: true }), 50);
         });
     } catch (err) {
@@ -1986,8 +2139,11 @@ function bindPresetUnloadGuard() {
                 outsidePresetSnapshot?.name || s.outsidePresetName || '',
             ).trim();
             const cur = getCurrentPresetSnapshot()?.name;
-            if (cur && cur !== restoreName && cur !== String(s.phonePresetName || '').trim()) {
-                // 用户在小手机里又切了别的预设：记为新的 B
+            if (cur && isPhonePoolPresetName(cur)) {
+                s.phonePresetName = cur;
+            } else if (cur && cur !== restoreName && cur !== String(s.phonePresetName || '').trim()
+                && !isPhonePoolPresetName(String(restoreName || ''))) {
+                // 遗留非池内名：仍记为手机预设
                 s.phonePresetName = cur;
             }
             s.phoneSessionBorrowed = true;
@@ -2050,17 +2206,23 @@ function healMainChatPresetAfterBorrow() {
     return true;
 }
 
-/** 离开小手机：把当前记为 B 并写入扩展库存，再还原外面 A + API 连接 */
+/** 离开小手机：把当前手机池预设记入扩展库存，再还原外面 A + API 连接 */
 function exitPhonePresetSession() {
     if (!phoneSessionActive) return;
 
     const current = getCurrentPresetSnapshot();
     const s = getSettings();
     const outsideName = String(outsidePresetSnapshot?.name || s.outsidePresetName || '').trim();
-    if (current?.name && current.name !== outsideName) {
-        s.phonePresetName = current.name;
-        snapshotActivePresetIntoPhoneStore(current.name);
+    const curName = String(current?.name || '').trim();
+    if (curName && isPhonePoolPresetName(curName)) {
+        s.phonePresetName = curName;
+        snapshotActivePresetIntoPhoneStore(curName);
+    } else if (curName && curName !== outsideName) {
+        // 遗留：非前缀但与外面不同的独立预设名
+        s.phonePresetName = curName;
+        snapshotActivePresetIntoPhoneStore(curName);
     }
+    // 若仍停在外面 A 上，保留原 phonePresetName，避免把 A 写成手机预设
 
     const restoreName = outsideName;
     const restoreValue = outsidePresetSnapshot?.value;
