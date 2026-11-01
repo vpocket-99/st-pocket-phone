@@ -11,7 +11,7 @@ import { setUserAvatar, user_avatar, getUserAvatar } from '../../../personas.js'
 const MODULE_NAME = 'st-pocket-phone';
 const EXTENSION_FOLDER = `scripts/extensions/third-party/${MODULE_NAME}`;
 /** 升级 UI 结构时递增，确保旧 DOM 被重建 */
-const PP_UI_VERSION = '34';
+const PP_UI_VERSION = '35';
 const PP_EXPORT_VERSION = 1;
 /** 导入/压缩触发阈值默认值（可在总结记忆页改） */
 const DEFAULT_MEMORY_TOKEN_LIMIT = 10000;
@@ -5281,15 +5281,25 @@ async function assembleMessagesFromPhonePreset(quietPrompt) {
         });
 }
 
-/** 让出两帧 + 短延迟，确保浏览器先把当前气泡画出来，再处理下一条 */
+/** 让出两帧 + 短延迟，确保浏览器先把当前气泡画出来 */
 function yieldToPaint() {
     return new Promise(resolve => {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                setTimeout(resolve, 120);
+                setTimeout(resolve, 80);
             });
         });
     });
+}
+
+/** 连发气泡间隔：1.0～2.0 秒随机，模拟真人打完一条再发下一条的停顿 */
+function randomBubbleGapMs() {
+    return 1000 + Math.floor(Math.random() * 1000);
+}
+
+function waitBubbleGap() {
+    const ms = randomBubbleGapMs();
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
@@ -5891,10 +5901,14 @@ async function generateModelReply(userTexts, opts = {}) {
     let firstBubbleShown = false;
 
     const pushBubbleLive = async (b) => {
-        if (!firstBubbleShown) {
-            firstBubbleShown = true;
-            setTypingIndicator(false);
+        // 第二条起先停顿再出泡，更像真人连发短信
+        if (firstBubbleShown) {
+            // 间隔期间重新亮起「正在输入」，下一条弹出时再关掉
+            setTypingIndicator(true);
+            await waitBubbleGap();
         }
+        firstBubbleShown = true;
+        setTypingIndicator(false);
         const msg = /** @type {PhoneMessage} */ ({
             role: b.role,
             text: b.text,
@@ -5906,7 +5920,6 @@ async function generateModelReply(userTexts, opts = {}) {
         writeAt += 1;
         persistThread();
         renderMessages({ animateIdx: at, forceBottom: true });
-        // 强制让出：否则多个气泡会在同一渲染周期里一起出现
         await yieldToPaint();
         // 不再逐条同步主聊天；离开小手机时整段一轮注入
     };
